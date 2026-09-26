@@ -296,7 +296,7 @@ const expandWithSynonyms = (word: string): string[] => {
  *  2. Multi-word queries are split and AND-matched
  *  3. Synonym expansion for common Indian document terms
  */
-export const searchDocuments = (query: string): DocumentRecord[] => {
+export const searchDocuments = (query: string, queryVector?: Float32Array): DocumentRecord[] => {
   const t0 = Date.now();
   try {
     const db = getDb();
@@ -308,6 +308,57 @@ export const searchDocuments = (query: string): DocumentRecord[] => {
 
     // Split query into individual words for multi-word AND matching
     const words = safeQuery.split(/\s+/).filter(w => w.length > 0);
+
+    // ── Hybrid Search: FTS5 + Vector via Reciprocal Rank Fusion ──────────
+    if (_ftsAvailable && _vecAvailable && queryVector && safeQuery) {
+      try {
+        const ftsTerms = words.map(w => `"${w}"*`).join(' OR ');
+        const vectorBlob = new Uint8Array(queryVector.buffer);
+
+        const hybridResults = db.executeSync(`
+          WITH
+          vector_matches AS (
+            SELECT
+              document_id AS rowid,
+              ROW_NUMBER() OVER (ORDER BY distance ASC) AS vec_rank
+            FROM vec_index
+            WHERE embedding MATCH vec_f32(?)
+              AND k = 50
+          ),
+          fts_matches AS (
+            SELECT
+              rowid,
+              ROW_NUMBER() OVER (ORDER BY rank ASC) AS fts_rank
+            FROM fts_index
+            WHERE fts_index MATCH ?
+            LIMIT 50
+          ),
+          combined AS (
+            SELECT rowid, fts_rank AS rank, 'fts' AS source FROM fts_matches
+            UNION ALL
+            SELECT rowid, vec_rank AS rank, 'vec' AS source FROM vector_matches
+          )
+          SELECT
+            d.id, d.title, d.content, d.filePath, d.type,
+            d.detection_type, d.timestamp,
+            SUM(CASE WHEN c.source = 'fts' THEN 2.0 / (60.0 + c.rank)
+                     ELSE 1.0 / (60.0 + c.rank) END) AS rrf_score
+          FROM combined c
+          JOIN document_index d ON d.id = c.rowid
+          GROUP BY c.rowid
+          ORDER BY rrf_score DESC
+          LIMIT 50
+        `, [vectorBlob, ftsTerms]);
+
+        const hybridHits = processResults(hybridResults);
+        if (hybridHits.length > 0) {
+          console.log(`[DB] Hybrid Search for "${safeQuery}" took ${Date.now() - t0}ms. Found ${hybridHits.length} hits.`);
+          return hybridHits;
+        }
+      } catch (err) {
+        console.warn('[DB] Hybrid search failed, falling back to FTS5:', err);
+      }
+    }
 
     if (_ftsAvailable && safeQuery) {
       try {
