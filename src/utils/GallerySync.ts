@@ -1,6 +1,6 @@
 import { CameraRoll } from "@react-native-camera-roll/camera-roll";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { indexDocument, isFileIndexed, beginTransaction, commitTransaction, rollbackTransaction } from '../Database';
+import { indexDocument, isFileIndexed, beginTransaction, commitTransaction, rollbackTransaction, indexEmbedding } from '../Database';
 import { buildIndexableContent } from './TextEnrichment';
 import { analyzeImage } from './VisionPipeline';
 import { AppLogger } from './AppLogger';
@@ -80,7 +80,10 @@ export const performQuickSync = async (
                 try {
                     const vision = await analyzeImage(uri);
                     const content = await buildIndexableContent(vision.content || 'image');
-                    indexDocument(null, content || vision.content || 'image', uri, 'IMAGE', vision.detection_type as 'TEXT' | 'OBJECT');
+                    const docId = indexDocument(null, content || vision.content || 'image', uri, 'IMAGE', vision.detection_type as 'TEXT' | 'OBJECT');
+                    if (docId && vision.embedding) {
+                        indexEmbedding(docId, vision.embedding);
+                    }
                     commitTransaction();
                 } catch (e) {
                     rollbackTransaction();
@@ -123,7 +126,10 @@ export const performQuickSync = async (
                         try {
                             const vision = await analyzeImage(uri);
                             const content = await buildIndexableContent(vision.content || 'image');
-                            indexDocument(null, content || vision.content || 'image', uri, 'IMAGE', vision.detection_type as 'TEXT' | 'OBJECT');
+                            const docId = indexDocument(null, content || vision.content || 'image', uri, 'IMAGE', vision.detection_type as 'TEXT' | 'OBJECT');
+                            if (docId && vision.embedding) {
+                                indexEmbedding(docId, vision.embedding);
+                            }
                         } catch (e) {
                             AppLogger.warn('QuickSync (BG)', `Failed to process ${uri}`, e);
                             indexDocument(null, 'image', uri, 'IMAGE', 'OBJECT');
@@ -193,7 +199,10 @@ export const performFullGallerySync = async (
                         } else {
                             content = await buildIndexableContent(rawText);
                         }
-                        indexDocument(null, content, uri, 'IMAGE', vision.detection_type as 'TEXT' | 'OBJECT');
+                        const docId = indexDocument(null, content, uri, 'IMAGE', vision.detection_type as 'TEXT' | 'OBJECT');
+                        if (docId && vision.embedding) {
+                            indexEmbedding(docId, vision.embedding);
+                        }
                         commitTransaction();
                     } catch (e) {
                         rollbackTransaction();
