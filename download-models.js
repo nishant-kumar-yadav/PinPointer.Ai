@@ -1,11 +1,12 @@
 /**
- * download-models.js — Build-time script to download sherpa-onnx models and AAR.
+ * download-models.js — Build-time script to download sherpa-onnx models, AAR, and MobileCLIP2-S0 ONNX models.
  * 
  * Downloads:
  *   1. Whisper Base (English, INT8 quantized) for STT (~165 MB)
- *   2. Piper VITS en_US-lessac-medium for English TTS (~63 MB)
- *   3. Piper VITS Hindi model for Hindi TTS
- *   4. sherpa-onnx Android AAR
+ *   2. MobileCLIP2-S0 Vision Encoder (INT8) for semantic search (~11 MB)
+ *   3. MobileCLIP2-S0 Text Encoder (INT8) for semantic search (~32 MB)
+ *   4. OpenCLIP BPE Vocabulary for text tokenization (~1.3 MB)
+ *   5. sherpa-onnx Android AAR
  * 
  * Models are placed into android/app/src/main/assets/models/
  * AAR is placed into android/app/libs/
@@ -37,6 +38,27 @@ const MODELS = [
         extractTo: path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'models', 'whisper'),
         type: 'archive',
     },
+    // MobileCLIP2-S0 models are exported via scripts/export_mobileclip.py
+    // and placed manually into android/app/src/main/assets/models/clip/
+    // (App has no internet permission — all models bundled in APK)
+    // {
+    //     name: 'MobileCLIP2-S0 Vision Encoder (INT8)',
+    //     url: 'https://huggingface.co/ppointer/mobileclip2-s0-onnx/resolve/main/vision_encoder_int8.onnx',
+    //     dest: path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'models', 'clip', 'vision_encoder.onnx'),
+    //     type: 'file',
+    // },
+    // {
+    //     name: 'MobileCLIP2-S0 Text Encoder (INT8)',
+    //     url: 'https://huggingface.co/ppointer/mobileclip2-s0-onnx/resolve/main/text_encoder_int8.onnx',
+    //     dest: path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'models', 'clip', 'text_encoder.onnx'),
+    //     type: 'file',
+    // },
+    // {
+    //     name: 'OpenCLIP BPE Vocabulary',
+    //     url: 'https://huggingface.co/ppointer/mobileclip2-s0-onnx/resolve/main/bpe_simple_vocab_16e6.txt',
+    //     dest: path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'models', 'clip', 'bpe_simple_vocab_16e6.txt'),
+    //     type: 'file',
+    // },
     // TTS models removed — not needed for Pinpointer's search flow.
     // Uncomment to re-enable TTS (adds ~155 MB to APK):
     // {
