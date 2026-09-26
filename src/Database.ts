@@ -1,4 +1,4 @@
-import { open } from 'react-native-quick-sqlite';
+import { open } from '@op-engineering/op-sqlite';
 import { soundex } from './utils/Soundex';
 import { maskSensitiveData } from './utils/DataMasking';
 
@@ -39,6 +39,7 @@ export const closeDatabase = () => {
 
 // ─── FTS5 availability flag ─────────────────────────────────────────────────
 let _ftsAvailable = false;
+let _vecAvailable = false;
 
 // ─── Schema Setup ───────────────────────────────────────────────────────────
 
@@ -47,10 +48,10 @@ export const setupDatabase = () => {
     const db = getDb();
 
     // Enable WAL mode for 2-3x faster concurrent reads/writes during sync
-    try { db.execute('PRAGMA journal_mode=WAL;'); } catch (_) { }
+    try { db.executeSync('PRAGMA journal_mode=WAL;'); } catch (_) { }
 
     // Main data table — always required
-    db.execute(`
+    db.executeSync(`
       CREATE TABLE IF NOT EXISTS document_index (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
@@ -63,16 +64,16 @@ export const setupDatabase = () => {
     `);
 
     // Add columns if upgrading from old schema (safe to run even if column exists)
-    try { db.execute(`ALTER TABLE document_index ADD COLUMN title TEXT;`); } catch (_) { }
-    try { db.execute(`ALTER TABLE document_index ADD COLUMN type TEXT DEFAULT 'IMAGE';`); } catch (_) { }
-    try { db.execute(`ALTER TABLE document_index ADD COLUMN detection_type TEXT DEFAULT 'TEXT';`); } catch (_) { }
-    try { db.execute(`ALTER TABLE document_index ADD COLUMN timestamp INTEGER;`); } catch (_) { }
-    try { db.execute(`ALTER TABLE document_index ADD COLUMN page_count INTEGER DEFAULT 0;`); } catch (_) { }
-    try { db.execute(`ALTER TABLE document_index ADD COLUMN pdf_status TEXT DEFAULT 'PENDING';`); } catch (_) { }
+    try { db.executeSync(`ALTER TABLE document_index ADD COLUMN title TEXT;`); } catch (_) { }
+    try { db.executeSync(`ALTER TABLE document_index ADD COLUMN type TEXT DEFAULT 'IMAGE';`); } catch (_) { }
+    try { db.executeSync(`ALTER TABLE document_index ADD COLUMN detection_type TEXT DEFAULT 'TEXT';`); } catch (_) { }
+    try { db.executeSync(`ALTER TABLE document_index ADD COLUMN timestamp INTEGER;`); } catch (_) { }
+    try { db.executeSync(`ALTER TABLE document_index ADD COLUMN page_count INTEGER DEFAULT 0;`); } catch (_) { }
+    try { db.executeSync(`ALTER TABLE document_index ADD COLUMN pdf_status TEXT DEFAULT 'PENDING';`); } catch (_) { }
 
     // Try FTS5 (may not be compiled into this SQLite build)
     try {
-      db.execute(`
+      db.executeSync(`
         CREATE VIRTUAL TABLE IF NOT EXISTS fts_index USING fts5(
           content,
           filePath UNINDEXED,
@@ -80,20 +81,20 @@ export const setupDatabase = () => {
         );
       `);
 
-      db.execute(`
+      db.executeSync(`
         CREATE TRIGGER IF NOT EXISTS fts_insert AFTER INSERT ON document_index BEGIN
           INSERT INTO fts_index(rowid, content, filePath)
           VALUES (NEW.id, NEW.content, NEW.filePath);
         END;
       `);
 
-      db.execute(`
+      db.executeSync(`
         CREATE TRIGGER IF NOT EXISTS fts_delete AFTER DELETE ON document_index BEGIN
           DELETE FROM fts_index WHERE rowid = OLD.id;
         END;
       `);
 
-      db.execute(`
+      db.executeSync(`
         CREATE TRIGGER IF NOT EXISTS fts_update AFTER UPDATE OF content ON document_index BEGIN
           DELETE FROM fts_index WHERE rowid = OLD.id;
           INSERT INTO fts_index(rowid, content, filePath)
@@ -108,6 +109,21 @@ export const setupDatabase = () => {
       console.warn('[DB] FTS5 not available, using LIKE fallback:', ftsError);
       console.log('[DB] Database Ready (LIKE mode)');
     }
+
+    // ─── sqlite-vec Vector Index ───────────────────────────────────────
+    try {
+      db.executeSync(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_index USING vec0(
+          document_id INTEGER PRIMARY KEY,
+          embedding float[512]
+        );
+      `);
+      _vecAvailable = true;
+      console.log('[DB] Vector index ready (sqlite-vec enabled)');
+    } catch (vecError) {
+      _vecAvailable = false;
+      console.warn('[DB] sqlite-vec not available:', vecError);
+    }
   } catch (error) {
     console.error('[DB] Setup Failed:', error);
   }
@@ -118,8 +134,8 @@ export const setupDatabase = () => {
 export const isFileIndexed = (path: string): boolean => {
   try {
     const db = getDb();
-    const result = db.execute('SELECT id FROM document_index WHERE filePath = ? LIMIT 1', [path]);
-    const rows = result?.rows?._array || (result?.rows ? Array.from(result.rows) : []);
+    const result = db.executeSync('SELECT id FROM document_index WHERE filePath = ? LIMIT 1', [path]);
+    const rows = result?.rows || [];
     return rows.length > 0;
   } catch (e) {
     console.warn('[DB] isFileIndexed check failed:', e);
@@ -133,26 +149,31 @@ export const indexDocument = (
   filePath: string,
   type: 'IMAGE' | 'DOCUMENT',
   detection_type: 'TEXT' | 'OBJECT'
-) => {
+): number | null => {
   // C2 fix: Mask PII (Aadhaar/PAN/phone) at the single chokepoint so no caller can bypass it
   content = maskSensitiveData(content ?? '');
 
   if (!content.trim() && !title?.trim()) {
     console.log('[DB] Skipped empty indexing for:', filePath);
-    return;
+    return null;
   }
 
   try {
     const db = getDb();
     // Always DELETE first to ensure FTS triggers fire correctly for updates
-    db.execute('DELETE FROM document_index WHERE filePath = ?', [filePath]);
-    db.execute(
+    db.executeSync('DELETE FROM document_index WHERE filePath = ?', [filePath]);
+    db.executeSync(
       'INSERT INTO document_index (title, content, filePath, type, detection_type, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
       [title, content.trim(), filePath, type, detection_type, Date.now()]
     );
-    console.log(`[DB] Indexed ✅ [${type}] ${filePath}`);
+    const idResult = db.executeSync('SELECT last_insert_rowid() as id');
+    const idRows = idResult?.rows || [];
+    const insertedId = idRows.length > 0 ? (idRows[0] as { id: number }).id : null;
+    console.log(`[DB] Indexed ✅ [${type}] ${filePath} (id=${insertedId})`);
+    return insertedId;
   } catch (e) {
     console.error('[DB] Save Failed:', e);
+    return null;
   }
 };
 
@@ -160,22 +181,69 @@ export const indexDocument = (
 // Wrap bulk inserts in BEGIN/COMMIT for 3-5x speed boost during sync
 
 export const beginTransaction = () => {
-  try { getDb().execute('BEGIN TRANSACTION;'); } catch (_) { }
+  try { getDb().executeSync('BEGIN TRANSACTION;'); } catch (_) { }
 };
 
 export const commitTransaction = () => {
-  try { getDb().execute('COMMIT;'); } catch (_) { }
+  try { getDb().executeSync('COMMIT;'); } catch (_) { }
 };
 
 export const rollbackTransaction = () => {
-  try { getDb().execute('ROLLBACK;'); } catch (_) { }
+  try { getDb().executeSync('ROLLBACK;'); } catch (_) { }
+};
+
+// ─── Vector Embedding Storage ───────────────────────────────────────────────
+
+/** Store a 512-dim INT8 embedding vector for a document */
+export const indexEmbedding = (documentId: number, embedding: Float32Array) => {
+  if (!_vecAvailable) return;
+  try {
+    const db = getDb();
+    db.executeSync('DELETE FROM vec_index WHERE document_id = ?', [documentId]);
+    db.executeSync(
+      'INSERT INTO vec_index (document_id, embedding) VALUES (?, vec_f32(?))',
+      [documentId, new Uint8Array(embedding.buffer)]
+    );
+    console.log(`[DB] Vector indexed ✅ doc_id=${documentId}`);
+  } catch (e) {
+    console.warn('[DB] Vector index failed:', e);
+  }
+};
+
+/** Check if a document has an embedding stored */
+export const hasEmbedding = (documentId: number): boolean => {
+  if (!_vecAvailable) return false;
+  try {
+    const db = getDb();
+    const result = db.executeSync(
+      'SELECT document_id FROM vec_index WHERE document_id = ? LIMIT 1',
+      [documentId]
+    );
+    const rows = result?.rows || [];
+    return rows.length > 0;
+  } catch (_) {
+    return false;
+  }
+};
+
+/** Get embedding count for stats */
+export const getEmbeddingCount = (): number => {
+  if (!_vecAvailable) return 0;
+  try {
+    const db = getDb();
+    const result = db.executeSync('SELECT COUNT(*) as cnt FROM vec_index');
+    const rows = result?.rows || [];
+    return rows.length > 0 ? (rows[0] as { cnt: number }).cnt : 0;
+  } catch (_) {
+    return 0;
+  }
 };
 
 /**
  * Helper to process query results into DocumentRecord array.
  */
 const processResults = (result: any): DocumentRecord[] => {
-  const rows = result?.rows?._array || (result?.rows ? Array.from(result.rows) : []);
+  const rows = result?.rows || [];
   return rows.map((row: any) => ({
     id: row.id,
     title: row.title,
@@ -228,7 +296,7 @@ const expandWithSynonyms = (word: string): string[] => {
  *  2. Multi-word queries are split and AND-matched
  *  3. Synonym expansion for common Indian document terms
  */
-export const searchDocuments = (query: string): DocumentRecord[] => {
+export const searchDocuments = (query: string, queryVector?: Float32Array): DocumentRecord[] => {
   const t0 = Date.now();
   try {
     const db = getDb();
@@ -241,11 +309,62 @@ export const searchDocuments = (query: string): DocumentRecord[] => {
     // Split query into individual words for multi-word AND matching
     const words = safeQuery.split(/\s+/).filter(w => w.length > 0);
 
+    // ── Hybrid Search: FTS5 + Vector via Reciprocal Rank Fusion ──────────
+    if (_ftsAvailable && _vecAvailable && queryVector && safeQuery) {
+      try {
+        const ftsTerms = words.map(w => `"${w}"*`).join(' OR ');
+        const vectorBlob = new Uint8Array(queryVector.buffer);
+
+        const hybridResults = db.executeSync(`
+          WITH
+          vector_matches AS (
+            SELECT
+              document_id AS rowid,
+              ROW_NUMBER() OVER (ORDER BY distance ASC) AS vec_rank
+            FROM vec_index
+            WHERE embedding MATCH vec_f32(?)
+              AND k = 50
+          ),
+          fts_matches AS (
+            SELECT
+              rowid,
+              ROW_NUMBER() OVER (ORDER BY rank ASC) AS fts_rank
+            FROM fts_index
+            WHERE fts_index MATCH ?
+            LIMIT 50
+          ),
+          combined AS (
+            SELECT rowid, fts_rank AS rank, 'fts' AS source FROM fts_matches
+            UNION ALL
+            SELECT rowid, vec_rank AS rank, 'vec' AS source FROM vector_matches
+          )
+          SELECT
+            d.id, d.title, d.content, d.filePath, d.type,
+            d.detection_type, d.timestamp,
+            SUM(CASE WHEN c.source = 'fts' THEN 2.0 / (60.0 + c.rank)
+                     ELSE 1.0 / (60.0 + c.rank) END) AS rrf_score
+          FROM combined c
+          JOIN document_index d ON d.id = c.rowid
+          GROUP BY c.rowid
+          ORDER BY rrf_score DESC
+          LIMIT 50
+        `, [vectorBlob, ftsTerms]);
+
+        const hybridHits = processResults(hybridResults);
+        if (hybridHits.length > 0) {
+          console.log(`[DB] Hybrid Search for "${safeQuery}" took ${Date.now() - t0}ms. Found ${hybridHits.length} hits.`);
+          return hybridHits;
+        }
+      } catch (err) {
+        console.warn('[DB] Hybrid search failed, falling back to FTS5:', err);
+      }
+    }
+
     if (_ftsAvailable && safeQuery) {
       try {
         // Build FTS5 query: each word with wildcard, AND-joined
         const ftsTerms = words.map(w => `"${w}"*`).join(' AND ');
-        const ftsResults = db.execute(
+        const ftsResults = db.executeSync(
           `SELECT d.id, d.title, d.content, d.filePath, d.type, d.detection_type, d.timestamp
            FROM fts_index f
            JOIN document_index d ON d.id = f.rowid
@@ -288,7 +407,7 @@ export const searchDocuments = (query: string): DocumentRecord[] => {
     }
 
     const whereSQL = whereClauses.join(' AND ');
-    const likeResults = db.execute(
+    const likeResults = db.executeSync(
       `SELECT id, title, content, filePath, type, detection_type, timestamp
        FROM document_index
        WHERE ${whereSQL}
@@ -396,8 +515,8 @@ export const extractSnippet = (content: string, query: string, snippetLen = 80):
 export const getIndexedCount = (): number => {
   try {
     const db = getDb();
-    const result = db.execute('SELECT COUNT(*) as cnt FROM document_index');
-    const rows = result?.rows?._array || (result?.rows ? Array.from(result.rows) : []);
+    const result = db.executeSync('SELECT COUNT(*) as cnt FROM document_index');
+    const rows = result?.rows || [];
     return rows.length > 0 ? (rows[0] as { cnt: number }).cnt : 0;
   } catch (e) {
     console.warn('[DB] Count Failed:', e);
@@ -409,9 +528,9 @@ export const getIndexedCount = (): number => {
 export const clearIndex = () => {
   try {
     const db = getDb();
-    db.execute('DELETE FROM document_index');
+    db.executeSync('DELETE FROM document_index');
     if (_ftsAvailable) {
-      try { db.execute('DELETE FROM fts_index'); } catch (_) { }
+      try { db.executeSync('DELETE FROM fts_index'); } catch (_) { }
     }
     console.log('[DB] Index cleared');
   } catch (e) {

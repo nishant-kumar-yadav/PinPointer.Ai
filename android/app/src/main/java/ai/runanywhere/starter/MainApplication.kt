@@ -27,6 +27,7 @@ class MainApplication : Application(), ReactApplication {
               add(NativePdfPackage())
               // sherpa-onnx powered on-device STT + TTS
               add(SherpaOnnxPackage())
+              add(MobileCLIPPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

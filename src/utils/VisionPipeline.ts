@@ -3,6 +3,7 @@ import ImageLabeling from '@react-native-ml-kit/image-labeling';
 import ImageResizer from 'react-native-image-resizer';
 import RNFS from 'react-native-fs';
 import { soundexAll } from './Soundex';
+import { encodeImage } from '../services/EmbeddingService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ export interface VisionResult {
     search_index: string[];
     /** Audit field — tells whether object detection ran or was bypassed */
     optimized_status: string;
+    /** 512-dim MobileCLIP embedding vector (null if encoding failed) */
+    embedding: Float32Array | null;
 }
 
 const MIN_TEXT_LENGTH = 3;
@@ -115,6 +118,14 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
         const { latin, hindi } = await runOCR(processUri);
         const combinedText = [latin, hindi].filter(Boolean).join(' ').trim();
 
+        // ── Step 4: Generate semantic embedding ────────────────────────────
+        let embedding: Float32Array | null = null;
+        try {
+            embedding = await encodeImage(processUri);
+        } catch (_) {
+            // Non-fatal — image still searchable via text/labels
+        }
+
         // ── Step 2: Early exit if CLEAN text found ──────────────────────────────
         if (combinedText.length >= MIN_TEXT_LENGTH && !isGarbageText(combinedText)) {
             const words = combinedText.split(/\s+/).filter(Boolean);
@@ -128,6 +139,7 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
                 search_index: [...words, ...soundexCodes],
                 content: [...words, ...soundexCodes].join(' '),
                 optimized_status: 'Object_Detection_Bypassed: True',
+                embedding,
             };
         }
 
@@ -142,6 +154,7 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
                 search_index: [...labels, ...soundexCodes],
                 content: [...labels, ...soundexCodes].join(' '),
                 optimized_status: 'Object_Detection_Bypassed: False',
+                embedding,
             };
         }
 
@@ -151,6 +164,7 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
             search_index: [],
             content: '',
             optimized_status: 'Object_Detection_Bypassed: False',
+            embedding,
         };
     } finally {
         // H5 fix: delete ImageResizer temp file to prevent unbounded cache growth

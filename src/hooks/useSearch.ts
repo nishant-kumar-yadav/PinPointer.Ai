@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { searchDocuments, DocumentRecord } from '../Database';
+import { encodeText } from '../services/EmbeddingService';
 import {
     loadSearchHistory, saveSearch, deleteSearchItem,
     clearSearchHistory, SearchHistoryItem,
@@ -30,25 +31,53 @@ export const useSearch = (isDbReady: boolean) => {
             return;
         }
 
+        let isCurrent = true;
         setIsSearchPending(true);
-        const timer = setTimeout(() => {
-            const results = searchDocuments(searchText);
-            setSearchResults(results);
-            setDebouncedSearchText(searchText);
-            setIsSearchPending(false);
+        const timer = setTimeout(async () => {
+            try {
+                // Generate semantic query vector for hybrid search
+                const queryVector = await encodeText(searchText);
+                if (!isCurrent) return;
+                const results = searchDocuments(searchText, queryVector ?? undefined);
+                if (!isCurrent) return;
+                setSearchResults(results);
+                setDebouncedSearchText(searchText);
+            } catch (e) {
+                console.error('[Search] search error:', e);
+            } finally {
+                if (isCurrent) {
+                    setIsSearchPending(false);
+                }
+            }
         }, 200);
-        return () => clearTimeout(timer);
+        return () => {
+            isCurrent = false;
+            clearTimeout(timer);
+        };
     }, [searchText, isDbReady]);
 
     // Save to history when user stops typing (debounced 800ms)
     useEffect(() => {
         if (!searchText.trim() || !isDbReady) return;
+        let isCurrent = true;
         const timer = setTimeout(async () => {
-            const results = searchDocuments(searchText);
-            await saveSearch(searchText, results.length);
-            setSearchHistory(await loadSearchHistory());
+            try {
+                // Generate semantic query vector for hybrid search
+                const queryVector = await encodeText(searchText);
+                if (!isCurrent) return;
+                const results = searchDocuments(searchText, queryVector ?? undefined);
+                if (!isCurrent) return;
+                await saveSearch(searchText, results.length);
+                if (!isCurrent) return;
+                setSearchHistory(await loadSearchHistory());
+            } catch (e) {
+                console.error('[Search] saveSearch error:', e);
+            }
         }, 800);
-        return () => clearTimeout(timer);
+        return () => {
+            isCurrent = false;
+            clearTimeout(timer);
+        };
     }, [searchText, isDbReady]);
 
     const handleSelectHistory = useCallback((query: string) => {
