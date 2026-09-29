@@ -10,5 +10,5 @@ const LinearGradient = React.forwardRef((props, ref) =>
 );
 LinearGradient.displayName = 'LinearGradient';
 
-module.exports = { default: LinearGradient };
+module.exports = { __esModule: true, default: LinearGradient };
 module.exports.LinearGradient = LinearGradient;

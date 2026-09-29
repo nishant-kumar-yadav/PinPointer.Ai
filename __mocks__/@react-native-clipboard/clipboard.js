@@ -11,5 +11,5 @@ const Clipboard = {
   removeAllListeners: jest.fn(),
 };
 
-module.exports = { default: Clipboard };
+module.exports = { __esModule: true, default: Clipboard };
 module.exports.Clipboard = Clipboard;
