@@ -7,6 +7,12 @@ interface AudioVisualizerProps {
   barCount?: number;
 }
 
+/**
+ * Animated audio-level bars for the voice recording UI.
+ *
+ * @param level Current audio level, 0.0 to 1.0.
+ * @param barCount Number of bars to render (default 7).
+ */
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   level,
   barCount = 7,

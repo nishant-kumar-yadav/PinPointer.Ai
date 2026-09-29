@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { AppColors } from '../theme';
 
@@ -13,12 +13,15 @@ interface SyncProps {
   totalImages?: number;
   totalDocs?: number;
   onQuickSync: () => void;
-  onDeepSync: () => void;
   onSyncDocs: () => void;
+  onDeepSync: () => void;
   onPauseSync: () => void;
   onResumeSync: () => void;
 }
 
+/**
+ * Card showing gallery/document sync progress with pause and resume controls.
+ */
 export const SyncProgressCard: React.FC<SyncProps> = ({
   isSyncing,
   isPaused,
@@ -29,8 +32,8 @@ export const SyncProgressCard: React.FC<SyncProps> = ({
   totalImages = 0,
   totalDocs = 0,
   onQuickSync,
-  onDeepSync,
   onSyncDocs,
+  onDeepSync: _onDeepSync,
   onPauseSync,
   onResumeSync,
 }) => {
@@ -64,6 +67,16 @@ export const SyncProgressCard: React.FC<SyncProps> = ({
   const progress = getProgress();
   const isIndeterminate = ((isSyncing || isPaused) && totalImages === 0) || (isSyncingDocs && totalDocs === 0);
 
+  // Dynamic portion of the progress fill (kept out of JSX for lint).
+  const fillDynamicStyle: ViewStyle = {
+    width: isIndeterminate ? '50%' : `${Math.round(progress * 100)}%`,
+    backgroundColor: isPaused
+      ? '#FFA500'
+      : isDeepSync || isSyncingDocs
+        ? AppColors.accentViolet
+        : AppColors.accentCyan,
+  };
+
   return (
     <View style={styles.card}>
       <LinearGradient
@@ -78,7 +91,7 @@ export const SyncProgressCard: React.FC<SyncProps> = ({
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={{ flex: 1 }}>
+          <View style={styles.headerTextWrap}>
             <Text style={styles.title}>{getTitle()}</Text>
             <Text style={styles.subtitle}>{getSubtitle()}</Text>
           </View>
@@ -88,17 +101,7 @@ export const SyncProgressCard: React.FC<SyncProps> = ({
         {(isSyncing || isPaused || isSyncingDocs) && (
           <View style={styles.track}>
             <View
-              style={[
-                styles.fill,
-                {
-                  width: isIndeterminate ? '50%' : `${Math.round(progress * 100)}%`,
-                  backgroundColor: isPaused
-                    ? '#FFA500'
-                    : isDeepSync || isSyncingDocs
-                      ? AppColors.accentViolet
-                      : AppColors.accentCyan,
-                },
-              ]}
+              style={[styles.fill, fillDynamicStyle]}
             />
           </View>
         )}
@@ -169,6 +172,7 @@ const styles = StyleSheet.create({
   },
   container: { padding: 16 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  headerTextWrap: { flex: 1 },
   title: { color: '#FFF', fontSize: 15, fontWeight: '700' },
   subtitle: { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 3 },
   track: {

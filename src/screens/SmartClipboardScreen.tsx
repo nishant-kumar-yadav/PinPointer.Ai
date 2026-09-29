@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,20 +12,19 @@ import {
     Share,
     Alert,
     Vibration,
-    Platform,
     Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import Svg, { Path, Rect, Circle } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { AppColors } from '../theme';
 import { analyzeImage } from '../utils/VisionPipeline';
-import { buildIndexableContent } from '../utils/TextEnrichment';
-import { indexDocument } from '../database';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
+import { AppLogger } from '../utils/AppLogger';
 
 // ─── Clipboard Icon Component ────────────────────────────────────────────────
 const ClipboardIcon: React.FC<{ size?: number; color?: string }> = ({
@@ -51,9 +50,14 @@ interface ClipboardItem {
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
+/**
+ * Smart clipboard: scan images into editable text, copy to the clipboard,
+ * share, and keep a history of recent clips. Accepts an optional
+ * `scanUri` route param to auto-scan an image (e.g. from the gallery).
+ */
 export const SmartClipboardScreen: React.FC = () => {
     const route = useRoute<RouteProp<RootStackParamList, 'SmartClipboard'>>();
-    const navigation = useNavigation<any>();
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
     // --- State ---
     const [imageUri, setImageUri] = useState<string | null>(route.params?.scanUri || null);
@@ -78,7 +82,7 @@ export const SmartClipboardScreen: React.FC = () => {
     const toastSequence = useRef<Animated.CompositeAnimation | null>(null);
 
     // Animate result in
-    const animateResultIn = () => {
+    const animateResultIn = useCallback(() => {
         fadeAnim.setValue(0);
         slideAnim.setValue(30);
         Animated.parallel([
@@ -94,7 +98,7 @@ export const SmartClipboardScreen: React.FC = () => {
                 useNativeDriver: true,
             }),
         ]).start();
-    };
+    }, [fadeAnim, slideAnim]);
 
     // Toast animation
 
@@ -152,23 +156,9 @@ export const SmartClipboardScreen: React.FC = () => {
         }
     }, [isProcessing, pulseAnim]);
 
-    // Auto-scan from route parameters (Deep Link from Pinpointer)
-    useEffect(() => {
-        if (route.params?.scanUri) {
-            const uriToScan = route.params.scanUri;
-            // Clear the param immediately so it doesn't re-trigger on back/forward
-            navigation.setParams({ scanUri: undefined });
-
-            // Small delay to let the screen transition finish before heavy OCR blocking
-            setTimeout(() => {
-                processImage(uriToScan);
-            }, 400);
-        }
-    }, [route.params?.scanUri]);
-
     // ─── Actions ─────────────────────────────────────────────────────────────
 
-    const processImage = async (uri: string) => {
+    const processImage = useCallback(async (uri: string) => {
         setImageUri(uri);
         setIsProcessing(true);
         setExtractedText('');
@@ -194,12 +184,26 @@ export const SmartClipboardScreen: React.FC = () => {
                 animateResultIn();
             }
         } catch (error) {
-            console.error('[SmartClipboard] OCR error:', error);
+            AppLogger.error('SmartClipboard', 'OCR error:', error);
             Alert.alert('Scan Error', 'Failed to process the image. Please try again.');
         } finally {
             setIsProcessing(false);
         }
-    };
+    }, [animateResultIn]);
+
+    // Auto-scan from route parameters (Deep Link from Pinpointer)
+    useEffect(() => {
+        if (route.params?.scanUri) {
+            const uriToScan = route.params.scanUri;
+            // Clear the param immediately so it doesn't re-trigger on back/forward
+            navigation.setParams({ scanUri: undefined });
+
+            // Small delay to let the screen transition finish before heavy OCR blocking
+            setTimeout(() => {
+                processImage(uriToScan);
+            }, 400);
+        }
+    }, [route.params?.scanUri, navigation, processImage]);
 
     const handleCamera = async () => {
         try {
@@ -214,7 +218,7 @@ export const SmartClipboardScreen: React.FC = () => {
                 processImage(result.assets[0].uri);
             }
         } catch (err) {
-            console.error('[SmartClipboard] Camera error:', err);
+            AppLogger.error('SmartClipboard', 'Camera error:', err);
         }
     };
 
@@ -230,7 +234,7 @@ export const SmartClipboardScreen: React.FC = () => {
                 processImage(result.assets[0].uri);
             }
         } catch (err) {
-            console.error('[SmartClipboard] Gallery error:', err);
+            AppLogger.error('SmartClipboard', 'Gallery error:', err);
         }
     };
 
@@ -256,21 +260,8 @@ export const SmartClipboardScreen: React.FC = () => {
         try {
             await Share.share({ message: editedText.trim() });
         } catch (e) {
-            console.error('[SmartClipboard] Share error:', e);
+            AppLogger.error('SmartClipboard', 'Share error:', e);
         }
-    };
-
-    const handleSave = () => {
-        if (!editedText.trim() || !imageUri) return;
-        indexDocument(
-            null,
-            editedText.trim(),
-            imageUri,
-            'IMAGE',
-            (detectionType as 'TEXT' | 'OBJECT') || 'TEXT'
-        );
-        Vibration.vibrate(30);
-        Alert.alert('Saved', 'Text has been saved to your library.');
     };
 
     const handleReset = () => {

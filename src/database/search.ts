@@ -4,6 +4,7 @@
  * relevance ranking, and snippet extraction.
  */
 import { soundex } from '../utils/Soundex';
+import { AppLogger } from '../utils/AppLogger';
 import { getDb, isFtsAvailable, isVecAvailable } from './connection';
 import { processResults } from './documents';
 import type { DocumentRecord } from './types';
@@ -105,11 +106,11 @@ export const searchDocuments = (query: string, queryVector?: Float32Array): Docu
 
         const hybridHits = processResults(hybridResults);
         if (hybridHits.length > 0) {
-          console.log(`[DB] Hybrid Search for "${safeQuery}" took ${Date.now() - t0}ms. Found ${hybridHits.length} hits.`);
+          AppLogger.info('DB', `Hybrid Search for "${safeQuery}" took ${Date.now() - t0}ms. Found ${hybridHits.length} hits.`);
           return hybridHits;
         }
       } catch (err) {
-        console.warn('[DB] Hybrid search failed, falling back to FTS5:', err);
+        AppLogger.warn('DB', 'Hybrid search failed, falling back to FTS5:', err);
       }
     }
 
@@ -128,11 +129,11 @@ export const searchDocuments = (query: string, queryVector?: Float32Array): Docu
         );
         results = processResults(ftsResults);
         if (results.length > 0) {
-          console.log(`[DB] FTS5 Search for "${safeQuery}" took ${Date.now() - t0}ms. Found ${results.length} hits.`);
+          AppLogger.info('DB', `FTS5 Search for "${safeQuery}" took ${Date.now() - t0}ms. Found ${results.length} hits.`);
           return results;
         }
       } catch (err) {
-        console.warn(`[DB] FTS5 matches failed for query "${trimmed}":`, err);
+        AppLogger.warn('DB', `FTS5 matches failed for query "${trimmed}":`, err);
       }
     }
 
@@ -170,7 +171,7 @@ export const searchDocuments = (query: string, queryVector?: Float32Array): Docu
     );
     results = processResults(likeResults);
 
-    console.log(`[DB] Enhanced Search for "${trimmed}" took ${Date.now() - t0}ms. Found ${results.length} hits.`);
+    AppLogger.info('DB', `Enhanced Search for "${trimmed}" took ${Date.now() - t0}ms. Found ${results.length} hits.`);
 
     // ─── Relevance Ranking ────────────────────────────────────────────
     // Score and re-sort results so the most relevant appear first
@@ -187,7 +188,7 @@ export const searchDocuments = (query: string, queryVector?: Float32Array): Docu
 
     return dedupedResults;
   } catch (e) {
-    console.error(`[DB] Search Failed after ${Date.now() - t0}ms:`, e);
+    AppLogger.error('DB', `Search Failed after ${Date.now() - t0}ms:`, e);
     return [];
   }
 };

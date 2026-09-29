@@ -12,8 +12,8 @@ import { AudioVisualizer } from '../components';
 import { useVoiceRecording } from '../hooks/useVoiceRecording';
 
 /**
- * SpeechToTextScreen — uses sherpa-onnx Whisper (on-device STT) via the useVoiceRecording hook.
- * 100% offline, on-device. No internet needed, no RunAnywhere dependency.
+ * Speech-to-text screen: record from the mic, transcribe on-device via the
+ * {@link useVoiceRecording} hook, and keep a capped transcript history.
  */
 export const SpeechToTextScreen: React.FC = () => {
   const [transcription, setTranscription] = useState('');

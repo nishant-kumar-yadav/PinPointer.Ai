@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { SyncProgressCard, ModelDownloadSheet, SearchHistoryPanel, SearchFilterChips, FilterCategory } from '../components';
+import { ModelDownloadSheet, SearchHistoryPanel, SearchFilterChips, FilterCategory } from '../components';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
@@ -32,9 +32,12 @@ import {
     Easing,
     Platform,
     Alert,
+    StyleProp,
+    ViewStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { AppColors } from '../theme';
+import { AppLogger } from '../utils/AppLogger';
 import { usePinpointerShared } from '../hooks/PinpointerContext';
 import { HomeScreen } from '../screens/HomeScreen';
 
@@ -47,6 +50,13 @@ const ScanIcon = ({ size = 22, color = '#fff' }) => (
     </Svg>
 );
 
+/**
+ * Main Pinpointer screen: universal search over indexed photos and documents.
+ *
+ * Hosts the search bar, suggestion pills, filter chips, search history,
+ * results list with preview modal, voice input, sync controls, and the
+ * slide-in drawer (which embeds {@link HomeScreen}).
+ */
 export const PinpointerScreen: React.FC = () => {
     const { width, height } = useWindowDimensions();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -58,9 +68,9 @@ export const PinpointerScreen: React.FC = () => {
         selectedImage, setSelectedImage,
         isRecording, isTranscribing, isModelLoading,
         startListening, stopListening,
-        handleScan, handleShare, handleEdit,
-        handleQuickSync, handleDeepSync, handlePauseSync, handleResumeSync,
-        isSyncing, isPaused, isDeepSync, syncCount, totalImages, lastSyncTime,
+        handleShare, handleEdit,
+        handleQuickSync, handleDeepSync,
+        isSyncing, isDeepSync, syncCount, lastSyncTime,
         isSyncingDocs, docSyncCount, totalDocs, lastDocSyncTime, handleDocumentSync,
         searchHistory, handleSelectHistory, handleDeleteHistory, handleClearHistory,
     } = usePinpointerShared();
@@ -125,10 +135,15 @@ export const PinpointerScreen: React.FC = () => {
         return days === 1 ? 'Yesterday' : `${days} days ago`;
     };
 
-    const renderSyncButton = (label: string, subtitle: string, color: string, onPress: () => void, active: boolean) => (
+    const renderSyncButton = (label: string, subtitle: string, color: string, onPress: () => void, active: boolean) => {
+        const syncButtonStyle: StyleProp<ViewStyle> = [
+            styles.solidButton,
+            { backgroundColor: color, opacity: active ? 0.7 : 1 },
+        ];
+        return (
         <>
             <TouchableOpacity
-                style={[styles.solidButton, { backgroundColor: color, opacity: active ? 0.7 : 1 }]}
+                style={syncButtonStyle}
                 onPress={onPress}
                 disabled={active}
             >
@@ -138,16 +153,15 @@ export const PinpointerScreen: React.FC = () => {
             </TouchableOpacity>
             <Text style={styles.dashboardButtonSubtitle}>{subtitle}</Text>
         </>
-    );
+        );
+    };
 
     const route = useRoute<RouteProp<RootStackParamList, 'Pinpointer'>>();
 
     const [showModelSheet, setShowModelSheet] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
     const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('ALL');
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-    const scrollViewRef = useRef<ScrollView>(null);
     const searchInputRef = useRef<TextInput>(null);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -203,7 +217,7 @@ export const PinpointerScreen: React.FC = () => {
         }).start();
     };
 
-    const closeDrawer = () => {
+    const closeDrawer = useCallback(() => {
         Animated.timing(drawerAnim, {
             toValue: -width,
             duration: 300,
@@ -211,7 +225,7 @@ export const PinpointerScreen: React.FC = () => {
         }).start(() => {
             setIsDrawerOpen(false);
         });
-    };
+    }, [drawerAnim, width]);
 
     useEffect(() => {
         const backAction = () => {
@@ -240,7 +254,7 @@ export const PinpointerScreen: React.FC = () => {
         );
 
         return () => backHandler.remove();
-    }, [isSearching, isDrawerOpen]);
+    }, [isSearching, isDrawerOpen, closeDrawer, setIsSearching, setSearchText]);
 
     useEffect(() => {
         if (isSearching) {
@@ -256,7 +270,7 @@ export const PinpointerScreen: React.FC = () => {
                 Animated.timing(slideAnim, { toValue: 1200, duration: 250, useNativeDriver: true })
             ]).start();
         }
-    }, [isSearching]); // Only trigger when isSearching explicitly toggles
+    }, [isSearching, fadeAnim, resultsSlideAnim, slideAnim]);
 
     // Handle Deep Sync trigger from HomeScreen Navigation
     useEffect(() => {
@@ -266,7 +280,7 @@ export const PinpointerScreen: React.FC = () => {
             // Clear parameter so it doesn't re-trigger on subsequent un-related mounts
             navigation.setParams({ startUniversalSync: false });
         }
-    }, [route.params?.startUniversalSync]);
+    }, [route.params?.startUniversalSync, handleDeepSync, navigation]);
 
     const handleBackPress = () => {
         Keyboard.dismiss();
@@ -313,7 +327,7 @@ export const PinpointerScreen: React.FC = () => {
         return (
             <Text style={styles.resultTitle} numberOfLines={2}>
                 {before}
-                <Text style={{ color: '#FBBF24', fontWeight: '700', backgroundColor: 'rgba(251, 191, 36, 0.15)' }}>{match}</Text>
+                <Text style={styles.highlightText}>{match}</Text>
                 {after}
             </Text>
         );
@@ -337,7 +351,7 @@ export const PinpointerScreen: React.FC = () => {
                         if (StorageModule && StorageModule.openPDF) {
                             StorageModule.openPDF(cleanPath);
                         } else {
-                            Linking.openURL(item.filePath).catch(e => console.error(e));
+                            Linking.openURL(item.filePath).catch(e => AppLogger.error('Pinpointer', 'Failed to open document URL', e));
                         }
                     } else {
                         openImage(item.filePath);
@@ -349,7 +363,7 @@ export const PinpointerScreen: React.FC = () => {
                 {/* Thumbnail */}
                 <View style={styles.resultIconContainer}>
                     {item.type === 'DOCUMENT' ? (
-                        <Text style={{ fontSize: 32 }}>{classifyDocument(item.content || '', item.filePath.split('/').pop() || '').emoji}</Text>
+                        <Text style={styles.documentEmoji}>{classifyDocument(item.content || '', item.filePath.split('/').pop() || '').emoji}</Text>
                     ) : (
                         <Image
                             source={{ uri: item.filePath }}
@@ -378,23 +392,15 @@ export const PinpointerScreen: React.FC = () => {
         );
     };
 
-    const handleScroll = (event: any) => {
-        const offsetX = event.nativeEvent.contentOffset.x;
-        const page = Math.round(offsetX / width);
-        if (page !== currentPage) {
-            setCurrentPage(page);
-        }
-    };
-
     // ─── Search Bar / Google Voice Component ────────────────────
     const renderSearchBar = (isTop: boolean = false) => (
         <View style={[styles.glassSearchBarContainer, isTop ? styles.searchBarTopSearch : styles.searchBarBottomNormal]}>
             {isRecording ? (
                 <View style={styles.googleVoiceContainer}>
-                    <Animated.View style={[styles.voiceCircle, { backgroundColor: 'rgba(66, 133, 244, 1)', transform: [{ scale: gVoiceAnim1 }] }]} />
-                    <Animated.View style={[styles.voiceCircle, { backgroundColor: 'rgba(234, 67, 53, 1)', transform: [{ scale: gVoiceAnim2 }] }]} />
-                    <Animated.View style={[styles.voiceCircle, { backgroundColor: 'rgba(251, 188, 5, 1)', transform: [{ scale: gVoiceAnim3 }] }]} />
-                    <Animated.View style={[styles.voiceCircle, { backgroundColor: 'rgba(52, 168, 83, 1)', transform: [{ scale: gVoiceAnim4 }] }]} />
+                    <Animated.View style={[styles.voiceCircle, styles.voiceCircleBlue, { transform: [{ scale: gVoiceAnim1 }] }]} />
+                    <Animated.View style={[styles.voiceCircle, styles.voiceCircleRed, { transform: [{ scale: gVoiceAnim2 }] }]} />
+                    <Animated.View style={[styles.voiceCircle, styles.voiceCircleYellow, { transform: [{ scale: gVoiceAnim3 }] }]} />
+                    <Animated.View style={[styles.voiceCircle, styles.voiceCircleGreen, { transform: [{ scale: gVoiceAnim4 }] }]} />
                     <TouchableOpacity
                         style={styles.voiceStopButton}
                         onPress={stopListening}
@@ -429,11 +435,11 @@ export const PinpointerScreen: React.FC = () => {
                         {isTranscribing || isModelLoading ? (
                             <Text style={styles.glassMicIcon}>⏳</Text>
                         ) : (
-                            <View style={{ alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
-                                <View style={{ width: 8, height: 12, borderRadius: 4, backgroundColor: '#9CA3AF' }} />
-                                <View style={{ position: 'absolute', bottom: 5, width: 14, height: 10, borderBottomWidth: 1.5, borderLeftWidth: 1.5, borderRightWidth: 1.5, borderColor: '#9CA3AF', borderBottomLeftRadius: 7, borderBottomRightRadius: 7 }} />
-                                <View style={{ position: 'absolute', bottom: 2, width: 1.5, height: 3, backgroundColor: '#9CA3AF' }} />
-                                <View style={{ position: 'absolute', bottom: 0, width: 8, height: 1.5, backgroundColor: '#9CA3AF', borderRadius: 1 }} />
+                            <View style={styles.micIconWrap}>
+                                <View style={styles.micCapsule} />
+                                <View style={styles.micArc} />
+                                <View style={styles.micStem} />
+                                <View style={styles.micBase} />
                             </View>
                         )}
                     </TouchableOpacity>
@@ -452,7 +458,7 @@ export const PinpointerScreen: React.FC = () => {
                 <View style={styles.aurora3} />
             </View>
 
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
                 {/* ────── NORMAL MODE (Glassmorphism Dashboard) ────── */}
                 <View style={StyleSheet.absoluteFillObject}>
                     <View style={styles.glassHeaderRow}>
@@ -461,17 +467,17 @@ export const PinpointerScreen: React.FC = () => {
                             onPress={openDrawer}
                             accessibilityLabel="Open menu"
                         >
-                            <Text style={{ color: '#FFF', fontSize: 24 }}>☰</Text>
+                            <Text style={styles.headerMenuIcon}>☰</Text>
                         </TouchableOpacity>
                         <Text style={styles.glassHeaderTitle}>Pinpointer</Text>
                     </View>
 
                     <View style={styles.dashboardMiddleSection}>
-                        <View style={{ flex: 1 }} />
+                        <View style={styles.flex1} />
 
                         <View style={styles.indexingCard}>
                             {(isSyncing || isSyncingDocs) && !isDeepSync ? (
-                                <Animated.View style={[{ width: '100%', opacity: syncFadeAnim }]}>
+                                <Animated.View style={[styles.fullWidth, { opacity: syncFadeAnim }]}>
                                     <View style={styles.loadingBoxContainer}>
                                         <LinearGradient
                                             colors={['rgba(0, 217, 255, 0.12)', 'rgba(0, 217, 255, 0.03)']}
@@ -575,7 +581,8 @@ export const PinpointerScreen: React.FC = () => {
                     pointerEvents={isSearching ? 'auto' : 'none'}
                     style={[
                         StyleSheet.absoluteFillObject,
-                        { zIndex: 100, backgroundColor: '#05050A', opacity: fadeAnim }
+                        styles.searchOverlayBase,
+                        { opacity: fadeAnim }
                     ]}
                 >
                     <View style={styles.glassBackground}>
@@ -591,8 +598,8 @@ export const PinpointerScreen: React.FC = () => {
                             style={styles.headerMenuButton}
                             accessibilityLabel="Close search"
                         >
-                            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                                <View style={{ width: 12, height: 12, borderLeftWidth: 2.5, borderBottomWidth: 2.5, borderColor: '#9CA3AF', transform: [{ rotate: '45deg' }] }} />
+                            <View style={styles.backArrowWrap}>
+                                <View style={styles.backArrow} />
                             </View>
                         </Pressable>
                         <Text style={styles.glassHeaderTitle}>Pinpointer</Text>
@@ -635,13 +642,13 @@ export const PinpointerScreen: React.FC = () => {
                                     showsVerticalScrollIndicator={false}
                                     ListEmptyComponent={
                                         isSearchPending ? (
-                                            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                                            <View style={styles.emptyLoadingWrap}>
                                                 <ActivityIndicator size="large" color={AppColors.accentCyan} />
                                             </View>
                                         ) : (
-                                            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                                            <View style={styles.emptyWrap}>
                                                 <Text style={styles.subTitle}>No matches found.</Text>
-                                                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 }}>
+                                                <Text style={styles.emptyHintText}>
                                                     Not in the last 300 photos?
                                                 </Text>
                                                 <TouchableOpacity
@@ -663,19 +670,11 @@ export const PinpointerScreen: React.FC = () => {
                                                         handleDeepSync();
                                                         handleDocumentSync();
                                                     }}
-                                                    style={{
-                                                        marginTop: 12,
-                                                        backgroundColor: 'rgba(138,43,226,0.3)',
-                                                        paddingHorizontal: 20,
-                                                        paddingVertical: 10,
-                                                        borderRadius: 20,
-                                                        borderWidth: 1,
-                                                        borderColor: 'rgba(138,43,226,0.6)',
-                                                    }}
+                                                    style={styles.syncCtaButton}
                                                     accessibilityLabel="Start Universal Sync"
                                                     accessibilityRole="button"
                                                 >
-                                                    <Text style={{ color: '#E9D5FF', fontWeight: 'bold' }}>
+                                                    <Text style={styles.syncCtaText}>
                                                         ⚡ Start Universal Sync
                                                     </Text>
                                                 </TouchableOpacity>
@@ -700,7 +699,7 @@ export const PinpointerScreen: React.FC = () => {
                         >
                             <Text style={styles.headerIcon}>✕</Text>
                         </TouchableOpacity>
-                        <View style={{ flexDirection: 'row' }}>
+                        <View style={styles.modalActions}>
                             <TouchableOpacity
                                 onPress={() => {
                                     if (selectedImage) {
@@ -709,7 +708,7 @@ export const PinpointerScreen: React.FC = () => {
                                         navigation.navigate('SmartClipboard', { scanUri: uri });
                                     }
                                 }}
-                                style={{ marginRight: 25 }}
+                                style={styles.actionBtn}
                                 accessibilityLabel="Scan image"
                                 accessibilityRole="button"
                             >
@@ -717,7 +716,7 @@ export const PinpointerScreen: React.FC = () => {
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={handleEdit}
-                                style={{ marginRight: 25 }}
+                                style={styles.actionBtn}
                                 accessibilityLabel="Edit image"
                                 accessibilityRole="button"
                             >
@@ -762,7 +761,7 @@ export const PinpointerScreen: React.FC = () => {
                     { transform: [{ translateX: drawerAnim }] }
                 ]}
             >
-                <HomeScreen navigation={navigation as any} onCloseDrawer={closeDrawer} />
+                <HomeScreen navigation={navigation} onCloseDrawer={closeDrawer} />
             </Animated.View>
         </View>
     );
@@ -770,6 +769,41 @@ export const PinpointerScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    flex1: { flex: 1 },
+    fullWidth: { width: '100%' },
+    highlightText: { color: '#FBBF24', fontWeight: '700', backgroundColor: 'rgba(251, 191, 36, 0.15)' },
+    documentEmoji: { fontSize: 32 },
+    voiceCircleBlue: { backgroundColor: 'rgba(66, 133, 244, 1)' },
+    voiceCircleRed: { backgroundColor: 'rgba(234, 67, 53, 1)' },
+    voiceCircleYellow: { backgroundColor: 'rgba(251, 188, 5, 1)' },
+    voiceCircleGreen: { backgroundColor: 'rgba(52, 168, 83, 1)' },
+    micIconWrap: { alignItems: 'center', justifyContent: 'center', width: 24, height: 24 },
+    micCapsule: { width: 8, height: 12, borderRadius: 4, backgroundColor: '#9CA3AF' },
+    micArc: {
+        position: 'absolute', bottom: 5, width: 14, height: 10,
+        borderBottomWidth: 1.5, borderLeftWidth: 1.5, borderRightWidth: 1.5,
+        borderColor: '#9CA3AF', borderBottomLeftRadius: 7, borderBottomRightRadius: 7,
+    },
+    micStem: { position: 'absolute', bottom: 2, width: 1.5, height: 3, backgroundColor: '#9CA3AF' },
+    micBase: { position: 'absolute', bottom: 0, width: 8, height: 1.5, backgroundColor: '#9CA3AF', borderRadius: 1 },
+    headerMenuIcon: { color: '#FFF', fontSize: 24 },
+    searchOverlayBase: { zIndex: 100, backgroundColor: '#05050A' },
+    backArrowWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+    backArrow: {
+        width: 12, height: 12, borderLeftWidth: 2.5, borderBottomWidth: 2.5,
+        borderColor: '#9CA3AF', transform: [{ rotate: '45deg' }],
+    },
+    emptyLoadingWrap: { alignItems: 'center', paddingVertical: 40 },
+    emptyWrap: { alignItems: 'center', paddingVertical: 24 },
+    emptyHintText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 6 },
+    syncCtaButton: {
+        marginTop: 12, backgroundColor: 'rgba(138,43,226,0.3)',
+        paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20,
+        borderWidth: 1, borderColor: 'rgba(138,43,226,0.6)',
+    },
+    syncCtaText: { color: '#E9D5FF', fontWeight: 'bold' },
+    modalActions: { flexDirection: 'row' },
+    actionBtn: { marginRight: 25 },
     background: { flex: 1 },
     header: { height: 60, marginTop: 50, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24 },
     menuButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'flex-start' },

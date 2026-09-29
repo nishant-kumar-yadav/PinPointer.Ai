@@ -124,8 +124,9 @@ describe('mount & persisted state', () => {
     const { result } = await renderHook(() => useDocumentSync());
     await act(async () => {});
     expect(result.current.lastDocSyncTime).toBeNull();
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[DocumentSync] Failed to load persisted time',
+    expect(AppLogger.error).toHaveBeenCalledWith(
+      'DocumentSync',
+      'Failed to load persisted time',
       expect.any(Error),
     );
   });

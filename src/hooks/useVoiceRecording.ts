@@ -15,7 +15,10 @@ const sherpaEmitter = new NativeEventEmitter(SherpaOnnxModule);
 /**
  * useVoiceRecording — handles mic recording and STT via sherpa-onnx (on-device Whisper).
  * 100% offline. No internet needed. No Google dependency.
- * Returns transcribed text via `onTranscription` callback.
+ *
+ * @param onTranscription Called with the trimmed transcript when recognition completes.
+ * @returns Recording/transcribing flags, live audio level, duration, and
+ * `startListening` / `stopListening` controls.
  */
 export const useVoiceRecording = (onTranscription: (text: string) => void) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -53,7 +56,7 @@ export const useVoiceRecording = (onTranscription: (text: string) => void) => {
             }
         });
 
-        const onSpeechResults = sherpaEmitter.addListener('onSpeechResults', (event: any) => {
+        const onSpeechResults = sherpaEmitter.addListener('onSpeechResults', (event: { value?: string[] }) => {
             setIsTranscribing(false);
             const text = event?.value?.[0] || '';
             if (text.trim()) {
@@ -61,7 +64,7 @@ export const useVoiceRecording = (onTranscription: (text: string) => void) => {
             }
         });
 
-        const onSpeechError = sherpaEmitter.addListener('onSpeechError', (error: any) => {
+        const onSpeechError = sherpaEmitter.addListener('onSpeechError', (error: unknown) => {
             setIsRecording(false);
             setIsTranscribing(false);
             setAudioLevel(0);

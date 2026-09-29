@@ -9,6 +9,15 @@ import { AppLogger } from '../utils/AppLogger';
 
 const { StorageModule } = NativeModules;
 
+/**
+ * Tracks document-sync state and crawls device storage for PDFs to index.
+ *
+ * Persists the last sync time in AsyncStorage and exposes the manual
+ * `handleDocumentSync` trigger plus a settings deep-link helper for the
+ * Android "All files access" permission.
+ *
+ * @returns Sync progress flags, counts, and control callbacks.
+ */
 export const useDocumentSync = () => {
     const [isSyncingDocs, setIsSyncingDocs] = useState(false);
     const [docSyncCount, setDocSyncCount] = useState(0);
@@ -20,7 +29,7 @@ export const useDocumentSync = () => {
             const timeStr = await AsyncStorage.getItem('doc_last_sync_time');
             if (timeStr) setLastDocSyncTime(parseInt(timeStr, 10));
         } catch (e) {
-            console.error('[DocumentSync] Failed to load persisted time', e);
+            AppLogger.error('DocumentSync', 'Failed to load persisted time', e);
         }
     }, []);
 
@@ -51,7 +60,6 @@ export const useDocumentSync = () => {
     const scanForPDFs = async (): Promise<RNFS.ReadDirItem[] | null> => {
         let pdfFiles: RNFS.ReadDirItem[] = [];
         const MAX_DEPTH = 4;
-        let permissionDenied = false;
 
         const scanRecursive = async (dirPath: string, currentDepth: number) => {
             if (currentDepth > MAX_DEPTH) return;
@@ -65,10 +73,9 @@ export const useDocumentSync = () => {
                         pdfFiles.push(item);
                     }
                 }
-            } catch (e: any) {
-                if (e.message && e.message.includes('EACCES')) {
-                    permissionDenied = true;
-                }
+            } catch {
+                // Ignore per-directory scan errors (e.g. EACCES under scoped
+                // storage); remaining directories are still scanned.
             }
         };
 
@@ -83,10 +90,8 @@ export const useDocumentSync = () => {
                 if (exists) {
                     await scanRecursive(dir, 1);
                 }
-            } catch (err: any) {
-                if (err.message && err.message.includes('EACCES')) {
-                    permissionDenied = true;
-                }
+            } catch {
+                // Ignore per-directory errors (e.g. EACCES under scoped storage).
             }
         }
 
@@ -151,7 +156,7 @@ export const useDocumentSync = () => {
                 }
             }
         } catch (err) {
-            console.error('[DocumentSync] Background crawler failed:', err);
+            AppLogger.error('DocumentSync', 'Background crawler failed:', err);
         } finally {
             setIsSyncingDocs(false);
             setDocSyncCount(0);

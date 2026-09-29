@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { AppColors } from '../theme';
 import { analyzeImage } from '../utils/VisionPipeline';
+import { AppLogger } from '../utils/AppLogger';
 
 // ─── Status Types ────────────────────────────────────────────────────────────
 type ScreenPhase =
@@ -24,6 +25,10 @@ type ScreenPhase =
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
+/**
+ * Point-and-speak: capture a photo (or pick from gallery), run on-device
+ * OCR (Hindi + English) via the vision pipeline, and show the detected text.
+ */
 export const PointAndSpeakScreen: React.FC = () => {
     // State
     const [phase, setPhase] = useState<ScreenPhase>('idle');
@@ -99,9 +104,9 @@ export const PointAndSpeakScreen: React.FC = () => {
                 useNativeDriver: true,
             }).start();
 
-            console.log('[PointAndSpeak] Extracted raw text, length:', result.raw_text.length);
+            AppLogger.info('PointAndSpeak', 'Extracted raw text, length:', result.raw_text.length);
         } catch (error) {
-            console.error('[PointAndSpeak] Pipeline error:', error);
+            AppLogger.error('PointAndSpeak', 'Pipeline error:', error);
             setPhase('no-text');
             Vibration.vibrate([0, 100, 50, 100]);
         }
@@ -120,7 +125,7 @@ export const PointAndSpeakScreen: React.FC = () => {
                 scanAndSpeak(result.assets[0].uri);
             }
         } catch (err) {
-            console.error('[PointAndSpeak] Camera error:', err);
+            AppLogger.error('PointAndSpeak', 'Camera error:', err);
         }
     };
 
@@ -136,7 +141,7 @@ export const PointAndSpeakScreen: React.FC = () => {
                 scanAndSpeak(result.assets[0].uri);
             }
         } catch (err) {
-            console.error('[PointAndSpeak] Gallery error:', err);
+            AppLogger.error('PointAndSpeak', 'Gallery error:', err);
         }
     };
 
@@ -235,7 +240,7 @@ export const PointAndSpeakScreen: React.FC = () => {
             <ActivityIndicator
                 size="large"
                 color={AppColors.accentGreen}
-                style={{ marginTop: 24 }}
+                style={styles.scanningIndicator}
             />
             <Text style={styles.scanningText}>Reading text...</Text>
             <Text style={styles.scanningSubtext}>Running OCR (Hindi + English)</Text>
@@ -611,5 +616,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+    scanningIndicator: {
+        marginTop: 24,
     },
 });

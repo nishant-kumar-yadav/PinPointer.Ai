@@ -2,6 +2,7 @@ import React from 'react';
 import { View, ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { AppColors } from '../theme';
 
+/** Result-type filter for the search results list. */
 export type FilterCategory = 'ALL' | 'IMAGE' | 'DOCUMENT';
 
 interface SearchFilterChipsProps {
@@ -9,6 +10,9 @@ interface SearchFilterChipsProps {
     onSelectFilter: (filter: FilterCategory) => void;
 }
 
+/**
+ * Horizontal ALL / IMAGE / DOCUMENT filter chips for the search results.
+ */
 export const SearchFilterChips: React.FC<SearchFilterChipsProps> = ({
     selectedFilter,
     onSelectFilter,

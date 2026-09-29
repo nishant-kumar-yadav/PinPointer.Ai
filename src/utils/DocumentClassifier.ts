@@ -10,6 +10,7 @@
 
 // ─── Document Categories ────────────────────────────────────────────────────
 
+/** The 18 document categories the classifier can assign. */
 export type DocumentCategory =
     | 'AADHAAR_CARD'
     | 'PAN_CARD'
@@ -176,6 +177,7 @@ const RULES: ClassificationRule[] = [
 
 // ─── Classifier ─────────────────────────────────────────────────────────────
 
+/** Result of classifying a document: its category plus a display emoji. */
 export interface ClassificationResult {
     category: DocumentCategory;
     emoji: string;
@@ -284,6 +286,12 @@ const scoreEducation = (lowerContent: string, fileName: string): number => {
     return score;
 };
 
+/**
+ * Classify a document into one of 18 categories using keyword scoring.
+ * @param content Document text content to score.
+ * @param fileName Optional file name/path — used as an extra scoring signal.
+ * @returns The winning category with its display emoji.
+ */
 export const classifyDocument = (content: string, fileName?: string): ClassificationResult => {
     const lowerContent = content.toLowerCase();
 

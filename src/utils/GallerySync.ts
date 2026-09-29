@@ -5,8 +5,10 @@ import { buildIndexableContent } from './TextEnrichment';
 import { analyzeImage } from './VisionPipeline';
 import { AppLogger } from './AppLogger';
 
-export const QUICK_SYNC_LIMIT = 50;  // Fast cap for UI loading mask
-export const SILENT_BACKGROUND_LIMIT = 250; // Total 300
+/** Max photos processed in the quick sync pass (fast cap for UI loading). */
+export const QUICK_SYNC_LIMIT = 50;
+/** Max photos processed in the silent background pass (quick + background = 300 total). */
+export const SILENT_BACKGROUND_LIMIT = 250;
 const DEEP_BATCH_SIZE = 10;          // Smaller batches for deep sync (memory safe)
 const QUICK_BATCH_SIZE = 50;         // Larger batches for quick sync (no sleep needed)
 const DEEP_SLEEP_MS = 200;           // Sleep between deep sync batches
@@ -23,6 +25,7 @@ const saveCursor = async (cursor: string | undefined) => {
     }
 };
 
+/** Load the persisted gallery-sync cursor (photo id to resume from). */
 export const loadSavedCursor = async (): Promise<string | undefined> => {
     try {
         const val = await AsyncStorage.getItem(CURSOR_KEY);
@@ -33,6 +36,7 @@ export const loadSavedCursor = async (): Promise<string | undefined> => {
     }
 };
 
+/** Clear the persisted gallery-sync cursor so the next sync starts over. */
 export const clearSyncCursor = async () => {
     try {
         await AsyncStorage.removeItem(CURSOR_KEY);
@@ -41,7 +45,9 @@ export const clearSyncCursor = async () => {
     }
 };
 
+/** Maximum photos the gallery sync will process (-1 = stub, not yet implemented). */
 export const getGallerySyncLimit = async (): Promise<number> => -1;
+/** Total photo count visible to gallery sync (-1 = stub, not yet implemented). */
 export const getGalleryTotalCount = async (): Promise<number> => -1;
 
 /**
@@ -54,7 +60,7 @@ export const performQuickSync = async (
     cancelRef?: React.MutableRefObject<boolean>,
 ): Promise<{ processed: number; wasCancelled: boolean }> => {
     let hasNextPage = true;
-    let after: string | undefined = undefined;
+    let after: string | undefined;
     let totalProcessed = 0;
 
     // Phase 1: Foreground loading (Block UI up to QUICK_SYNC_LIMIT)

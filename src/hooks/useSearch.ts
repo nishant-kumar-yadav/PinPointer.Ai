@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { searchDocuments, DocumentRecord } from '../database';
 import { encodeText } from '../services/EmbeddingService';
+import { AppLogger } from '../utils/AppLogger';
 import {
     loadSearchHistory, saveSearch, deleteSearchItem,
     clearSearchHistory, SearchHistoryItem,
@@ -8,6 +9,12 @@ import {
 
 /**
  * useSearch — handles search text, debounced DB queries, results, and history.
+ *
+ * Runs the FTS + vector hybrid search 200ms after the last keystroke and
+ * persists successful queries to the search history (debounced 800ms).
+ *
+ * @param isDbReady Whether the SQLite database has finished initializing.
+ * @returns Search state (text, results, pending flags, history) and handlers.
  */
 export const useSearch = (isDbReady: boolean) => {
     const [searchText, setSearchText] = useState('');
@@ -43,7 +50,7 @@ export const useSearch = (isDbReady: boolean) => {
                 setSearchResults(results);
                 setDebouncedSearchText(searchText);
             } catch (e) {
-                console.error('[Search] search error:', e);
+                AppLogger.error('Search', 'search error:', e);
             } finally {
                 if (isCurrent) {
                     setIsSearchPending(false);
@@ -71,7 +78,7 @@ export const useSearch = (isDbReady: boolean) => {
                 if (!isCurrent) return;
                 setSearchHistory(await loadSearchHistory());
             } catch (e) {
-                console.error('[Search] saveSearch error:', e);
+                AppLogger.error('Search', 'saveSearch error:', e);
             }
         }, 800);
         return () => {

@@ -2,7 +2,7 @@ import 'react-native-gesture-handler'; // Must be at the top!
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
-import { StatusBar } from 'react-native';
+import { StatusBar, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ModelServiceProvider } from './services/ModelService';
 import { PinpointerProvider } from './hooks/PinpointerContext';
@@ -18,9 +18,14 @@ import {
 } from './screens';
 import { setupDatabase, closeDatabase } from './database';
 import { RootStackParamList } from './navigation/types';
+import { AppLogger } from './utils/AppLogger';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
+/**
+ * App root: initializes the SQLite database, wires the navigation stack,
+ * and provides the model service and Pinpointer shared state.
+ */
 const App: React.FC = () => {
   useEffect(() => {
     const initializeApp = async () => {
@@ -28,9 +33,9 @@ const App: React.FC = () => {
         // 1. Initialize Pinpoint Search Database
         setupDatabase();
 
-        console.log('All systems initialized successfully');
+        AppLogger.info('App', 'All systems initialized successfully');
       } catch (error) {
-        console.error('Initialization failed:', error);
+        AppLogger.error('App', 'Initialization failed:', error);
       }
     };
 
@@ -42,7 +47,7 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <ModelServiceProvider>
         <PinpointerProvider>
         <StatusBar barStyle="light-content" backgroundColor={AppColors.primaryDark} />
@@ -86,3 +91,9 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

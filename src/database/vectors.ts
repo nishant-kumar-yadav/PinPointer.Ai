@@ -2,6 +2,7 @@
  * sqlite-vec embedding storage: per-document 512-dim vectors.
  */
 import { getDb, isVecAvailable } from './connection';
+import { AppLogger } from '../utils/AppLogger';
 
 /** Store a 512-dim INT8 embedding vector for a document */
 export const indexEmbedding = (documentId: number, embedding: Float32Array) => {
@@ -13,9 +14,9 @@ export const indexEmbedding = (documentId: number, embedding: Float32Array) => {
       'INSERT INTO vec_index (document_id, embedding) VALUES (?, vec_f32(?))',
       [documentId, new Uint8Array(embedding.buffer)]
     );
-    console.log(`[DB] Vector indexed ✅ doc_id=${documentId}`);
+    AppLogger.info('DB', `Vector indexed ✅ doc_id=${documentId}`);
   } catch (e) {
-    console.warn('[DB] Vector index failed:', e);
+    AppLogger.warn('DB', 'Vector index failed:', e);
   }
 };
 

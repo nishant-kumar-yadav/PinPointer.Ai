@@ -24,17 +24,6 @@ const maskPAN = (text: string): string => {
 };
 
 /**
- * Mask bank account numbers (8-18 digits): 12345678901234 → **********1234
- */
-const maskBankAccount = (text: string): string => {
-    return text.replace(/\b(\d{8,18})\b/g, (match) => {
-        if (match.length < 8) return match; // Too short to be an account number
-        const lastFour = match.slice(-4);
-        return '*'.repeat(match.length - 4) + lastFour;
-    });
-};
-
-/**
  * Mask phone numbers (10-digit Indian): 9876543210 → ******3210
  */
 const maskPhone = (text: string): string => {

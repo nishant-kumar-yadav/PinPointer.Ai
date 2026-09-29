@@ -17,6 +17,8 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/types';
 
 const BackIcon: React.FC<{ size?: number; color?: string }> = ({ size = 24, color = '#fff' }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -32,8 +34,14 @@ const CARD_SIZE = (width - 60) / 3;
 
 type FilterType = "Today" | "Yesterday" | "Last Week";
 
+/**
+ * Recent-photos gallery with Today / Yesterday / Last Week filters.
+ *
+ * Tapping a photo opens a preview modal with scan (→ SmartClipboard),
+ * edit, share, and close actions.
+ */
 export const GalleryScreen = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [activeFilter, setActiveFilter] = useState<FilterType>("Today");
   const [allPhotos, setAllPhotos] = useState<RecentPhoto[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -57,7 +65,6 @@ export const GalleryScreen = () => {
   }, [selectedImage]);
 
   const getFilteredData = () => {
-    const now = Date.now();
     const ONE_DAY = 24 * 60 * 60 * 1000;
     const startOfToday = new Date().setHours(0, 0, 0, 0);
 
@@ -78,7 +85,7 @@ export const GalleryScreen = () => {
     >
       <Image
         source={{ uri: item.uri }}
-        style={{ width: '100%', height: '100%', borderRadius: 20 }}
+        style={styles.gridImage}
         resizeMode="cover"
       />
     </TouchableOpacity>
@@ -126,12 +133,12 @@ export const GalleryScreen = () => {
         renderItem={renderItem}
         keyExtractor={(item) => item.uri}
         numColumns={3}
-        columnWrapperStyle={{ justifyContent: "space-between" }}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', marginTop: 40 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.4)' }}>No recent photos found for {activeFilter.toLowerCase()}.</Text>
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>No recent photos found for {activeFilter.toLowerCase()}.</Text>
           </View>
         }
       />
@@ -147,7 +154,7 @@ export const GalleryScreen = () => {
             >
               <Text style={styles.headerIcon}>✕</Text>
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row' }}>
+            <View style={styles.modalActions}>
               <TouchableOpacity
                 onPress={() => {
                   if (selectedImage) {
@@ -156,7 +163,7 @@ export const GalleryScreen = () => {
                     navigation.navigate('SmartClipboard', { scanUri: uri });
                   }
                 }}
-                style={{ marginRight: 25 }}
+                style={styles.actionBtn}
                 accessibilityLabel="Scan image"
                 accessibilityRole="button"
               >
@@ -164,7 +171,7 @@ export const GalleryScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleEdit}
-                style={{ marginRight: 25 }}
+                style={styles.actionBtn}
                 accessibilityLabel="Edit image"
                 accessibilityRole="button"
               >
@@ -200,6 +207,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
   },
+  gridImage: { width: '100%', height: '100%', borderRadius: 20 },
+  columnWrapper: { justifyContent: "space-between" },
+  listContent: { paddingBottom: 40 },
+  emptyWrap: { alignItems: 'center', marginTop: 40 },
+  emptyText: { color: 'rgba(255,255,255,0.4)' },
+  modalActions: { flexDirection: 'row' },
+  actionBtn: { marginRight: 25 },
   header: {
     flexDirection: "row",
     alignItems: "center",

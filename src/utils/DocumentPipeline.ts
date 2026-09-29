@@ -19,7 +19,6 @@
 import { NativeModules } from 'react-native';
 import RNFS from 'react-native-fs';
 import { analyzeImage } from './VisionPipeline';
-import { buildIndexableContent } from './TextEnrichment';
 import { soundexAll } from './Soundex';
 import { classifyDocument, extractSmartTitle, type ClassificationResult } from './DocumentClassifier';
 import { maskSensitiveData } from './DataMasking';
@@ -37,12 +36,14 @@ const MIN_TEXT_LENGTH = 20;   // Below this, treat as image-based PDF
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+/** Basic metadata extracted from a PDF file. */
 export interface PdfMetadata {
     fileName: string;
     pageCount: number;
     fileSize: number;
 }
 
+/** Lifecycle status of a PDF going through the document pipeline. */
 export type PdfProcessingStatus =
     | 'PENDING'
     | 'METADATA'
@@ -50,6 +51,7 @@ export type PdfProcessingStatus =
     | 'OCR_COMPLETE'
     | 'FAILED';
 
+/** Full result of processing one PDF: status, metadata, and searchable content. */
 export interface PipelineResult {
     status: PdfProcessingStatus;
     metadata: PdfMetadata;
@@ -202,7 +204,7 @@ const rasterizeAndOCR = async (
         // Cleanup rasterized images from cache
         try {
             await NativePdfModule.cleanupCache();
-        } catch (_) { /* non-critical */ }
+        } catch { /* non-critical */ }
 
         const combinedContent = allContent.join(' ').substring(0, MAX_TOTAL_CHARS);
         return {

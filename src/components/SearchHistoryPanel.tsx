@@ -13,6 +13,9 @@ interface Props {
     onClearAll: () => void;
 }
 
+/**
+ * Expandable panel of recent search queries with per-item delete and clear-all.
+ */
 export const SearchHistoryPanel: React.FC<Props> = ({
     history, onSelect, onDelete, onClearAll,
 }) => {
@@ -52,7 +55,7 @@ export const SearchHistoryPanel: React.FC<Props> = ({
                         >
                             {/* Left: query */}
                             <View style={styles.rowLeft}>
-                                <View style={{ flex: 1 }}>
+                                <View style={styles.queryWrap}>
                                     <Text style={styles.queryText} numberOfLines={1}>
                                         {item.query}
                                     </Text>
@@ -78,7 +81,7 @@ export const SearchHistoryPanel: React.FC<Props> = ({
                         </LinearGradient>
                     </TouchableOpacity>
                 )}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ItemSeparatorComponent={HistorySeparator}
             />
         </View>
     );
@@ -121,6 +124,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
+    queryWrap: { flex: 1 },
     queryText: {
         color: '#FFF',
         fontSize: 14,
@@ -148,4 +152,7 @@ const styles = StyleSheet.create({
     emptyIcon: { fontSize: 32, marginBottom: 10 },
     emptyText: { color: 'rgba(255,255,255,0.35)', fontSize: 13 },
 });
+
+/** FlatList item separator (module-level so it isn't recreated each render). */
+const HistorySeparator: React.FC = () => <View style={styles.separator} />;
 

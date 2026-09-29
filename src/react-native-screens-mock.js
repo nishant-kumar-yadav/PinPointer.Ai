@@ -5,20 +5,22 @@
  * to avoid crashes with react-native-screens on RN 0.83's mandatory New Architecture.
  */
 import React from 'react';
-import { View, Animated } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 // Simple View wrapper that accepts all props
 const ScreenView = React.forwardRef((props, ref) => {
   const { children, style, enabled, activityState, ...rest } = props;
   return (
-    <View ref={ref} style={[{ flex: 1 }, style]} {...rest}>
+    <View ref={ref} style={[styles.flex, style]} {...rest}>
       {children}
     </View>
   );
 });
 ScreenView.displayName = 'Screen';
 
-const AnimatedScreenView = Animated.createAnimatedComponent(ScreenView);
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+});
 
 // Screen components
 export const Screen = ScreenView;

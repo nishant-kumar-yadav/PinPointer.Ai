@@ -21,16 +21,19 @@ const push = (entry: LogEntry) => {
 };
 
 export const AppLogger = {
+    /** Log an informational message under a tag. */
     info: (tag: string, message: string, detail?: unknown) => {
         console.log(`[${tag}] ${message}`, detail ?? '');
         push({ level: 'info', tag, message, timestamp: Date.now(), detail });
     },
 
+    /** Log a warning under a tag. */
     warn: (tag: string, message: string, detail?: unknown) => {
         console.warn(`[${tag}] ${message}`, detail ?? '');
         push({ level: 'warn', tag, message, timestamp: Date.now(), detail });
     },
 
+    /** Log an error under a tag. */
     error: (tag: string, message: string, detail?: unknown) => {
         console.error(`[${tag}] ${message}`, detail ?? '');
         push({ level: 'error', tag, message, timestamp: Date.now(), detail });

@@ -21,6 +21,11 @@ interface FeatureCardProps {
   onPress?: () => void;
 }
 
+/**
+ * Tappable gradient feature card used on the Home screen.
+ *
+ * Shows an emoji icon (or a custom one), a title, and a subtitle.
+ */
 export const FeatureCard: React.FC<FeatureCardProps> = ({
   title,
   subtitle,
@@ -34,7 +39,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
   return (
     <TouchableOpacity onPress={onPress} style={[styles.container, style]} activeOpacity={0.8}>
       <View style={styles.cardInner}>
-        <Text style={[styles.icon, iconSize ? { fontSize: iconSize } : {}, iconStyle] as any}>
+        <Text style={[styles.icon, iconSize ? { fontSize: iconSize } : {}, iconStyle] as StyleProp<TextStyle>}>
           {icon || getIconEmoji(title)}
         </Text>
         <Text style={styles.title}>{title}</Text>

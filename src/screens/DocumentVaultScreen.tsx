@@ -10,11 +10,12 @@ import {
     NativeModules,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { AppLogger } from '../utils/AppLogger';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/types';
 import { getAllDocuments, DocumentRecord } from '../database';
-import { classifyDocument, type ClassificationResult, type DocumentCategory } from '../utils/DocumentClassifier';
+import { classifyDocument, type DocumentCategory } from '../utils/DocumentClassifier';
 
 const { StorageModule } = NativeModules;
 
@@ -85,6 +86,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── Screen Component ───────────────────────────────────────────────────────
 
+/**
+ * Document vault: indexed documents grouped by AI-classified category.
+ *
+ * Loads the vault on focus, lets the user expand/collapse category sections,
+ * and opens documents via the native StorageModule (or a file URL fallback).
+ */
 export const DocumentVaultScreen: React.FC<Props> = ({ navigation }) => {
     const [groups, setGroups] = useState<CategoryGroup[]>([]);
     const [totalDocs, setTotalDocs] = useState(0);
@@ -107,7 +114,7 @@ export const DocumentVaultScreen: React.FC<Props> = ({ navigation }) => {
                 Linking.openURL(uri);
             }
         } catch (e) {
-            console.warn('Failed to open document:', e);
+            AppLogger.warn('DocumentVault', 'Failed to open document:', e);
         }
     };
 
@@ -143,7 +150,7 @@ export const DocumentVaultScreen: React.FC<Props> = ({ navigation }) => {
                 >
                     <View style={styles.categoryHeader}>
                         <Text style={styles.categoryEmoji}>{group.emoji}</Text>
-                        <View style={{ flex: 1 }}>
+                        <View style={styles.flex1}>
                             <Text style={styles.categoryLabel}>{group.label}</Text>
                             <Text style={[styles.categoryCount, { color }]}>
                                 {group.documents.length} {group.documents.length === 1 ? 'document' : 'documents'}
@@ -164,7 +171,7 @@ export const DocumentVaultScreen: React.FC<Props> = ({ navigation }) => {
                                     activeOpacity={0.6}
                                 >
                                     <Text style={styles.documentIcon}>📄</Text>
-                                    <View style={{ flex: 1 }}>
+                                    <View style={styles.flex1}>
                                         <Text style={styles.documentTitle} numberOfLines={1}>
                                             {doc.title || 'Untitled'}
                                         </Text>
@@ -203,9 +210,9 @@ export const DocumentVaultScreen: React.FC<Props> = ({ navigation }) => {
             <StatusBar barStyle="light-content" backgroundColor="#05050A" />
 
             {/* Background Glow */}
-            <View style={[StyleSheet.absoluteFillObject, { overflow: 'hidden' }]}>
-                <View style={{ position: 'absolute', top: -120, right: -200, width: 500, height: 300, backgroundColor: 'rgba(99, 102, 241, 0.08)', transform: [{ rotate: '25deg' }], borderRadius: 250 }} />
-                <View style={{ position: 'absolute', bottom: -80, left: -150, width: 600, height: 250, backgroundColor: 'rgba(168, 85, 247, 0.06)', transform: [{ rotate: '-20deg' }], borderRadius: 300 }} />
+            <View style={styles.backgroundGlowWrap}>
+                <View style={styles.glowTop} />
+                <View style={styles.glowBottom} />
             </View>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -275,6 +282,31 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#05050A',
+    },
+    flex1: { flex: 1 },
+    backgroundGlowWrap: {
+        ...StyleSheet.absoluteFillObject,
+        overflow: 'hidden',
+    },
+    glowTop: {
+        position: 'absolute',
+        top: -120,
+        right: -200,
+        width: 500,
+        height: 300,
+        backgroundColor: 'rgba(99, 102, 241, 0.08)',
+        transform: [{ rotate: '25deg' }],
+        borderRadius: 250,
+    },
+    glowBottom: {
+        position: 'absolute',
+        bottom: -80,
+        left: -150,
+        width: 600,
+        height: 250,
+        backgroundColor: 'rgba(168, 85, 247, 0.06)',
+        transform: [{ rotate: '-20deg' }],
+        borderRadius: 300,
     },
     scroll: {
         flex: 1,

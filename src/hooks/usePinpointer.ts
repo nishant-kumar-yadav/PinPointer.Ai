@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert, Share, Linking, Platform, NativeModules } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { indexDocument } from '../database';
@@ -20,7 +20,7 @@ export const usePinpointer = () => {
 
     // --- Sub-hooks ---
     const {
-        searchText, setSearchText, debouncedSearchText,
+        searchText, setSearchText,
         searchResults,
         isSearching, setIsSearching, isSearchPending,
         searchHistory,

@@ -3,12 +3,15 @@ import ImageLabeling from '@react-native-ml-kit/image-labeling';
 import ImageResizer from 'react-native-image-resizer';
 import RNFS from 'react-native-fs';
 import { soundexAll } from './Soundex';
+import { AppLogger } from './AppLogger';
 import { encodeImage } from '../services/EmbeddingService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** What analyzeImage found in the picture. */
 export type DetectionType = 'TEXT' | 'OBJECT' | 'EMPTY';
 
+/** Structured result of the vision pipeline for one image. */
 export interface VisionResult {
     detection_type: DetectionType;
     /** Original raw text extracted before any enrichment */
@@ -70,7 +73,7 @@ const runLabeling = async (uri: string): Promise<string[]> => {
             .sort((a, b) => b.confidence - a.confidence)
             .slice(0, 7)                          // up to 7 labels
             .map(l => l.text);
-    } catch (_) {
+    } catch {
         return [];
     }
 };
@@ -109,7 +112,7 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
         processUri = resized.uri;
     } catch (resizeError) {
         // Soft fail — continue with raw 12MP image if resizer fails for some reason
-        console.warn('[VisionPipeline] Resize failed, using full resolution:', resizeError);
+        AppLogger.warn('VisionPipeline', 'Resize failed, using full resolution:', resizeError);
     }
 
     // H5 fix: wrap in try/finally to clean up resized temp file
@@ -122,7 +125,7 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
         let embedding: Float32Array | null = null;
         try {
             embedding = await encodeImage(processUri);
-        } catch (_) {
+        } catch {
             // Non-fatal — image still searchable via text/labels
         }
 
@@ -171,7 +174,7 @@ export const analyzeImage = async (originalUri: string): Promise<VisionResult> =
         if (processUri !== originalUri) {
             try {
                 await RNFS.unlink(processUri.replace('file://', ''));
-            } catch (_) {
+            } catch {
                 // Ignore — temp file may already be cleaned up
             }
         }

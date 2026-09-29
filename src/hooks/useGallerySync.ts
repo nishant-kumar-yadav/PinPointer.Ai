@@ -13,7 +13,7 @@ export const useGallerySync = () => {
     const [isPaused, setIsPaused] = useState(false);
     const [isDeepSync, setIsDeepSync] = useState(false);
     const [syncCount, setSyncCount] = useState(0);
-    const [totalImages, setTotalImages] = useState(0);
+    const [totalImages] = useState(0);
     const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
     const cancelRef = useRef<boolean>(false);
 
@@ -84,7 +84,7 @@ export const useGallerySync = () => {
             setIsSyncing(true);
             setIsPaused(false);
 
-            const { processed } = await performQuickSync(
+            await performQuickSync(
                 (count) => setSyncCount(count),
                 cancelRef,
             );

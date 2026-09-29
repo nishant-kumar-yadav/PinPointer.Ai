@@ -7,6 +7,8 @@ import {
   Animated,
   Easing,
   Image,
+  StyleProp,
+  TextStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -15,10 +17,23 @@ import { RootStackParamList } from '../navigation/types';
 import { usePinpointerShared } from '../hooks/PinpointerContext';
 
 type HomeScreenProps = {
-  navigation: StackNavigationProp<RootStackParamList, 'Home'>;
+  navigation: StackNavigationProp<RootStackParamList>;
   onCloseDrawer?: () => void;
 };
 
+/** Shared icon nudge for Home feature cards (module-level to avoid inline styles). */
+const cardIconStyle: StyleProp<TextStyle> = {
+  includeFontPadding: false,
+  transform: [{ translateY: -3 }],
+};
+
+/**
+ * Home screen: feature cards for each capability, live sync status,
+ * and the on-device privacy banner.
+ *
+ * @param navigation Stack navigation (typed for the whole RootStackParamList).
+ * @param onCloseDrawer Optional callback fired before navigating (drawer mode).
+ */
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onCloseDrawer }) => {
   const {
     isSyncing,
@@ -80,9 +95,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onCloseDrawe
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#05050A" />
-      <View style={[StyleSheet.absoluteFillObject, { overflow: 'hidden' }]}>
-        <View style={{ position: 'absolute', top: -100, left: -150, width: 800, height: 250, backgroundColor: 'rgba(99, 102, 241, 0.1)', transform: [{ rotate: '45deg' }], borderRadius: 400 }} />
-        <View style={{ position: 'absolute', bottom: -50, right: -250, width: 900, height: 300, backgroundColor: 'rgba(168, 85, 247, 0.1)', transform: [{ rotate: '-35deg' }], borderRadius: 450 }} />
+      <View style={styles.backgroundGlowWrap}>
+        <View style={styles.glowTop} />
+        <View style={styles.glowBottom} />
       </View>
       <View style={styles.mainContent}>
         {/* Header */}
@@ -90,7 +105,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onCloseDrawe
           <View style={styles.logoCircle}>
             <Image
               source={require('../assets/logo.png')}
-              style={{ width: 58, height: 58, borderRadius: 29 }}
+              style={styles.logoImage}
               resizeMode="cover"
             />
           </View>
@@ -99,58 +114,52 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onCloseDrawe
 
         <View style={styles.gridContainer}>
           {/* Row 1: Scan Images + Read Aloud */}
-          <View style={{ flexDirection: 'row', height: 120, marginBottom: 12 }}>
-            <View style={{ flex: 1, marginRight: 6 }}>
+          <View style={styles.cardRow}>
+            <View style={styles.cardCellLeft}>
               <FeatureCard
                 title="Scan Images"
                 subtitle="Image to Text"
                 icon="⛶"
                 iconSize={32}
-                iconStyle={{ includeFontPadding: false, transform: [{ translateY: -3 }] }}
-                style={{ flex: 1 }}
+                iconStyle={cardIconStyle}
+                style={styles.cardFill}
                 onPress={() => { if (onCloseDrawer) onCloseDrawer(); navigation.navigate('SmartClipboard'); }}
               />
             </View>
           </View>
 
           {/* Row 2: Gallery + Document Vault */}
-          <View style={{ flexDirection: 'row', height: 120, marginBottom: 12 }}>
-            <View style={{ flex: 1, marginRight: 6 }}>
+          <View style={styles.cardRow}>
+            <View style={styles.cardCellLeft}>
               <FeatureCard
                 title="Recent searches"
                 subtitle="Gallery & History"
                 icon="◷"
                 iconSize={60}
-                iconStyle={{ includeFontPadding: false, transform: [{ translateY: -3 }] }}
-                style={{ flex: 1 }}
-                onPress={() => { if (onCloseDrawer) onCloseDrawer(); navigation.navigate('Gallery' as any); }}
+                iconStyle={cardIconStyle}
+                style={styles.cardFill}
+                onPress={() => { if (onCloseDrawer) onCloseDrawer(); navigation.navigate('Gallery'); }}
               />
             </View>
-            <View style={{ flex: 1, marginLeft: 6 }}>
+            <View style={styles.cardCellRight}>
               <FeatureCard
                 title="Doc Vault"
                 subtitle="AI-Classified"
                 icon="◈"
                 iconSize={32}
-                iconStyle={{ includeFontPadding: false, transform: [{ translateY: -3 }] }}
-                style={{
-                  flex: 1,
-                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(99, 102, 241, 0.2)',
-                  borderRadius: 20,
-                }}
+                iconStyle={cardIconStyle}
+                style={styles.docVaultCard}
                 onPress={() => { if (onCloseDrawer) onCloseDrawer(); navigation.navigate('DocumentVault'); }}
               />
             </View>
           </View>
 
           {/* Divider */}
-          <View style={{ height: 1, backgroundColor: 'rgba(139, 92, 246, 0.3)', width: '100%', marginVertical: 16 }} />
+          <View style={styles.divider} />
 
           {/* PERFECTLY SIZED SYNC CARD (140px Height) */}
           {(isSyncing || isSyncingDocs) ? (
-            <Animated.View style={[{ width: '100%', opacity: syncFadeAnim }]}>
+            <Animated.View style={[styles.fullWidth, { opacity: syncFadeAnim }]}>
               <View style={styles.loadingBoxContainer}>
                 <LinearGradient
                   colors={['rgba(0, 217, 255, 0.12)', 'rgba(0, 217, 255, 0.03)']}
@@ -199,15 +208,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, onCloseDrawe
               subtitle="Index Entire Device"
               icon="⟳"
               iconSize={32}
-              iconStyle={{ includeFontPadding: false, transform: [{ translateY: -3 }] }}
-              style={{
-                width: '100%',
-                height: 140,
-                backgroundColor: 'rgba(109, 40, 217, 0.15)',
-                borderWidth: 1,
-                borderColor: 'rgba(139, 92, 246, 0.25)',
-                borderRadius: 20,
-              }}
+              iconStyle={cardIconStyle}
+              style={styles.syncCard}
               onPress={() => {
                 // If closing drawer logic exists, call it immediately
                 if (onCloseDrawer) onCloseDrawer();
@@ -238,6 +240,57 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#05050A',
+  },
+  backgroundGlowWrap: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  glowTop: {
+    position: 'absolute',
+    top: -100,
+    left: -150,
+    width: 800,
+    height: 250,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    transform: [{ rotate: '45deg' }],
+    borderRadius: 400,
+  },
+  glowBottom: {
+    position: 'absolute',
+    bottom: -50,
+    right: -250,
+    width: 900,
+    height: 300,
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+    transform: [{ rotate: '-35deg' }],
+    borderRadius: 450,
+  },
+  logoImage: { width: 58, height: 58, borderRadius: 29 },
+  cardRow: { flexDirection: 'row', height: 120, marginBottom: 12 },
+  cardCellLeft: { flex: 1, marginRight: 6 },
+  cardCellRight: { flex: 1, marginLeft: 6 },
+  cardFill: { flex: 1 },
+  fullWidth: { width: '100%' },
+  docVaultCard: {
+    flex: 1,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.2)',
+    borderRadius: 20,
+  },
+  syncCard: {
+    width: '100%',
+    height: 140,
+    backgroundColor: 'rgba(109, 40, 217, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.25)',
+    borderRadius: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    width: '100%',
+    marginVertical: 16,
   },
   mainContent: {
     flex: 1,

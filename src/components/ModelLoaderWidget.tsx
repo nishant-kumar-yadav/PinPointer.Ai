@@ -19,6 +19,9 @@ interface ModelLoaderWidgetProps {
   onLoad: () => void;
 }
 
+/**
+ * Inline widget showing AI model download progress with a manual load trigger.
+ */
 export const ModelLoaderWidget: React.FC<ModelLoaderWidgetProps> = ({
   title,
   subtitle,

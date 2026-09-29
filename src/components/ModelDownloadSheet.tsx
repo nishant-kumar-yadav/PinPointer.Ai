@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    Modal, Animated, Dimensions, Alert
+    Modal, Animated, Dimensions, Alert, ViewStyle, TextStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useModelService } from '../services/ModelService';
@@ -34,7 +34,7 @@ const ModelRow: React.FC<ModelRowProps> = ({
             duration: 300,
             useNativeDriver: false,
         }).start();
-    }, [progress, isDownloading, isLoaded]);
+    }, [progress, isDownloading, isLoaded, animWidth]);
 
     const getStatus = () => {
         if (isLoaded) return { label: '✅ Ready', color: '#22C55E' };
@@ -45,16 +45,30 @@ const ModelRow: React.FC<ModelRowProps> = ({
 
     const status = getStatus();
 
+    // Dynamic styles (depend on props/state; kept out of JSX for lint).
+    const iconAccentStyle: ViewStyle = { backgroundColor: accent + '20' };
+    const statusColorStyle: TextStyle = { color: status.color };
+    const trackFillAnimatedStyle: ViewStyle = {
+        backgroundColor: isLoaded ? '#22C55E' : accent,
+        width: animWidth.interpolate({
+            inputRange: [0, 100],
+            outputRange: ['0%', '100%'],
+        }),
+    };
+    const downloadBtnAccentStyle: ViewStyle = { borderColor: accent };
+    const downloadBtnDisabledStyle: ViewStyle = { borderColor: accent, opacity: 0.5 };
+    const downloadBtnTextAccentStyle: TextStyle = { color: accent };
+
     return (
         <View style={styles.modelRow}>
-            <View style={[styles.modelIcon, { backgroundColor: accent + '20' }]}>
+            <View style={[styles.modelIcon, iconAccentStyle]}>
                 <Text style={styles.modelEmoji}>{icon}</Text>
             </View>
 
-            <View style={{ flex: 1 }}>
+            <View style={styles.modelBody}>
                 <View style={styles.modelHeader}>
                     <Text style={styles.modelName}>{name}</Text>
-                    <Text style={[styles.modelStatus, { color: status.color }]}>{status.label}</Text>
+                    <Text style={[styles.modelStatus, statusColorStyle]}>{status.label}</Text>
                 </View>
 
                 {/* Progress track */}
@@ -62,13 +76,7 @@ const ModelRow: React.FC<ModelRowProps> = ({
                     <Animated.View
                         style={[
                             styles.trackFill,
-                            {
-                                backgroundColor: isLoaded ? '#22C55E' : accent,
-                                width: animWidth.interpolate({
-                                    inputRange: [0, 100],
-                                    outputRange: ['0%', '100%'],
-                                }),
-                            },
+                            trackFillAnimatedStyle,
                         ]}
                     />
                 </View>
@@ -76,16 +84,16 @@ const ModelRow: React.FC<ModelRowProps> = ({
 
             {!isLoaded && !isDownloading && !isLoading && (
                 <TouchableOpacity
-                    style={[styles.downloadBtn, { borderColor: accent }]}
+                    style={[styles.downloadBtn, downloadBtnAccentStyle]}
                     onPress={onDownload}
                 >
-                    <Text style={[styles.downloadBtnText, { color: accent }]}>↓</Text>
+                    <Text style={[styles.downloadBtnText, downloadBtnTextAccentStyle]}>↓</Text>
                 </TouchableOpacity>
             )}
 
             {(isLoading || isDownloading) && (
-                <View style={[styles.downloadBtn, { borderColor: accent, opacity: 0.5 }]}>
-                    <Text style={{ fontSize: 12 }}>⏳</Text>
+                <View style={[styles.downloadBtn, downloadBtnDisabledStyle]}>
+                    <Text style={styles.downloadPendingIcon}>⏳</Text>
                 </View>
             )}
         </View>
@@ -97,6 +105,12 @@ interface Props {
     onClose: () => void;
 }
 
+/**
+ * Bottom sheet listing the on-device AI models with download progress.
+ *
+ * @param visible Whether the sheet is shown.
+ * @param onClose Called when the sheet is dismissed.
+ */
 export const ModelDownloadSheet: React.FC<Props> = ({ visible, onClose }) => {
     const slideAnim = useRef(new Animated.Value(height)).current;
     const {
@@ -113,7 +127,7 @@ export const ModelDownloadSheet: React.FC<Props> = ({ visible, onClose }) => {
             tension: 65,
             friction: 11,
         }).start();
-    }, [visible]);
+    }, [visible, slideAnim]);
 
     return (
         <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
@@ -133,15 +147,15 @@ export const ModelDownloadSheet: React.FC<Props> = ({ visible, onClose }) => {
                                 try {
                                     const contents = await RNFS.readDirAssets('models');
                                     Alert.alert('Asset Models Folder', JSON.stringify(contents.map(c => c.name), null, 2));
-                                } catch (e: any) {
-                                    Alert.alert('Read Dir Failed', e?.message || 'unknown error');
+                                } catch (e: unknown) {
+                                    Alert.alert('Read Dir Failed', e instanceof Error ? e.message : 'unknown error');
                                 }
-                            }} style={{ marginTop: 8, padding: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }}>
-                                <Text style={{ color: 'white', fontSize: 10 }}>Debug Assets</Text>
+                            }} style={styles.debugBtn}>
+                                <Text style={styles.debugBtnText}>Debug Assets</Text>
                             </TouchableOpacity>
                         </View>
                         <TouchableOpacity onPress={onClose}>
-                            <Text style={{ color: AppColors.textMuted, fontSize: 22 }}>✕</Text>
+                            <Text style={styles.closeBtnText}>✕</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -250,6 +264,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     downloadBtnText: { fontSize: 16, fontWeight: '700' },
+    downloadPendingIcon: { fontSize: 12 },
+    modelBody: { flex: 1 },
+    debugBtn: {
+        marginTop: 8,
+        padding: 4,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 4,
+    },
+    debugBtnText: { color: 'white', fontSize: 10 },
+    closeBtnText: { color: AppColors.textMuted, fontSize: 22 },
 
     doneBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 16 },
     doneBtnGrad: { paddingVertical: 15, alignItems: 'center' },

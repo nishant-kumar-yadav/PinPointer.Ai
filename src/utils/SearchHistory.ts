@@ -4,6 +4,7 @@ import { AppLogger } from './AppLogger';
 const HISTORY_KEY = 'search_history';
 const MAX_HISTORY = 30;
 
+/** One saved search-history entry. */
 export interface SearchHistoryItem {
     query: string;
     timestamp: number; // epoch ms

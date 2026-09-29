@@ -2,24 +2,41 @@
  * Document CRUD: indexing, existence checks, counts, clearing, vault listing.
  */
 import { maskSensitiveData } from '../utils/DataMasking';
+import { AppLogger } from '../utils/AppLogger';
 import { getDb, isFtsAvailable } from './connection';
 import type { DocumentRecord } from './types';
+
+/** A raw row as returned by op-sqlite query results. */
+interface RawRow {
+  id: number;
+  title: string | null;
+  content: string;
+  filePath: string;
+  type: string;
+  detection_type: string;
+  timestamp: number;
+}
 
 /**
  * Maps raw DB rows to DocumentRecord objects.
  * @internal Shared with search.ts; not part of the public barrel.
  */
-export const processResults = (result: any): DocumentRecord[] => {
-  const rows = result?.rows || [];
-  return rows.map((row: any) => ({
-    id: row.id,
-    title: row.title,
-    content: row.content,
-    filePath: row.filePath,
-    type: row.type,
-    detection_type: row.detection_type,
-    timestamp: row.timestamp,
-  })) as DocumentRecord[];
+export const processResults = (
+  result: { rows?: Array<Record<string, unknown>> } | null | undefined
+): DocumentRecord[] => {
+  const rows = result?.rows ?? [];
+  return rows.map((row) => {
+    const r = row as unknown as RawRow;
+    return {
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      filePath: r.filePath,
+      type: r.type,
+      detection_type: r.detection_type,
+      timestamp: r.timestamp,
+    };
+  }) as DocumentRecord[];
 };
 
 export const isFileIndexed = (path: string): boolean => {
@@ -29,7 +46,7 @@ export const isFileIndexed = (path: string): boolean => {
     const rows = result?.rows || [];
     return rows.length > 0;
   } catch (e) {
-    console.warn('[DB] isFileIndexed check failed:', e);
+    AppLogger.warn('DB', 'isFileIndexed check failed:', e);
     return false;
   }
 };
@@ -45,7 +62,7 @@ export const indexDocument = (
   content = maskSensitiveData(content ?? '');
 
   if (!content.trim() && !title?.trim()) {
-    console.log('[DB] Skipped empty indexing for:', filePath);
+    AppLogger.info('DB', 'Skipped empty indexing for:', filePath);
     return null;
   }
 
@@ -60,10 +77,10 @@ export const indexDocument = (
     const idResult = db.executeSync('SELECT last_insert_rowid() as id');
     const idRows = idResult?.rows || [];
     const insertedId = idRows.length > 0 ? (idRows[0] as { id: number }).id : null;
-    console.log(`[DB] Indexed ✅ [${type}] ${filePath} (id=${insertedId})`);
+    AppLogger.info('DB', `Indexed ✅ [${type}] ${filePath} (id=${insertedId})`);
     return insertedId;
   } catch (e) {
-    console.error('[DB] Save Failed:', e);
+    AppLogger.error('DB', 'Save Failed:', e);
     return null;
   }
 };
@@ -76,7 +93,7 @@ export const getIndexedCount = (): number => {
     const rows = result?.rows || [];
     return rows.length > 0 ? (rows[0] as { cnt: number }).cnt : 0;
   } catch (e) {
-    console.warn('[DB] Count Failed:', e);
+    AppLogger.warn('DB', 'Count Failed:', e);
     return 0;
   }
 };
@@ -89,9 +106,9 @@ export const clearIndex = () => {
     if (isFtsAvailable()) {
       try { db.executeSync('DELETE FROM fts_index'); } catch { }
     }
-    console.log('[DB] Index cleared');
+    AppLogger.info('DB', 'Index cleared');
   } catch (e) {
-    console.error('[DB] Clear Failed:', e);
+    AppLogger.error('DB', 'Clear Failed:', e);
   }
 };
 
@@ -99,7 +116,9 @@ export const clearIndex = () => {
 export const getAllDocuments = (): DocumentRecord[] => {
   try {
     const db = getDb();
-    const result = db.execute(
+    // NOTE: must be executeSync — the async execute() returns a Promise,
+    // which processResults would read as "no rows" (empty vault on device).
+    const result = db.executeSync(
       `SELECT id, title, content, filePath, type, detection_type, timestamp
        FROM document_index
        WHERE type = 'DOCUMENT'
@@ -107,7 +126,7 @@ export const getAllDocuments = (): DocumentRecord[] => {
     );
     return processResults(result);
   } catch (e) {
-    console.warn('[DB] getAllDocuments failed:', e);
+    AppLogger.warn('DB', 'getAllDocuments failed:', e);
     return [];
   }
 };

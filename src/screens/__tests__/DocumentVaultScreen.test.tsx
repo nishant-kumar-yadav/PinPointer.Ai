@@ -510,7 +510,7 @@ describe('DocumentVaultScreen', () => {
     await pressText(screen, 'Crash Doc');
 
     expect(console.warn).toHaveBeenCalledWith(
-      'Failed to open document:',
+      '[DocumentVault] Failed to open document:',
       expect.any(Error),
     );
     // The list is still intact after the failed open.
@@ -538,7 +538,7 @@ describe('DocumentVaultScreen', () => {
       await pressText(screen, 'Bad Link Doc');
 
       expect(console.warn).toHaveBeenCalledWith(
-        'Failed to open document:',
+        '[DocumentVault] Failed to open document:',
         expect.any(Error),
       );
     } finally {

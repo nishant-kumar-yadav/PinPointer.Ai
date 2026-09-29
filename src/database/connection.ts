@@ -3,6 +3,7 @@
  * capability flags (FTS5 / sqlite-vec), and teardown.
  */
 import { open } from '@op-engineering/op-sqlite';
+import { AppLogger } from '../utils/AppLogger';
 
 // ─── Singleton DB ───────────────────────────────────────────────────────────
 
@@ -21,9 +22,9 @@ export const closeDatabase = () => {
     try {
       _db.close();
       _db = null;
-      console.log('[DB] Database Connection Closed safely');
+      AppLogger.info('DB', 'Database Connection Closed safely');
     } catch (e) {
-      console.error('[DB] Failed to close database safely', e);
+      AppLogger.error('DB', 'Failed to close database safely', e);
     }
   }
 };
@@ -102,11 +103,11 @@ export const setupDatabase = () => {
       `);
 
       _ftsAvailable = true;
-      console.log('[DB] Database Ready (FTS5 enabled)');
+      AppLogger.info('DB', 'Database Ready (FTS5 enabled)');
     } catch (ftsError) {
       _ftsAvailable = false;
-      console.warn('[DB] FTS5 not available, using LIKE fallback:', ftsError);
-      console.log('[DB] Database Ready (LIKE mode)');
+      AppLogger.warn('DB', 'FTS5 not available, using LIKE fallback:', ftsError);
+      AppLogger.info('DB', 'Database Ready (LIKE mode)');
     }
 
     // ─── sqlite-vec Vector Index ───────────────────────────────────────
@@ -118,12 +119,12 @@ export const setupDatabase = () => {
         );
       `);
       _vecAvailable = true;
-      console.log('[DB] Vector index ready (sqlite-vec enabled)');
+      AppLogger.info('DB', 'Vector index ready (sqlite-vec enabled)');
     } catch (vecError) {
       _vecAvailable = false;
-      console.warn('[DB] sqlite-vec not available:', vecError);
+      AppLogger.warn('DB', 'sqlite-vec not available:', vecError);
     }
   } catch (error) {
-    console.error('[DB] Setup Failed:', error);
+    AppLogger.error('DB', 'Setup Failed:', error);
   }
 };
