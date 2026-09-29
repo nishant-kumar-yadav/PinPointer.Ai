@@ -73,6 +73,9 @@ export const SmartClipboardScreen: React.FC = () => {
     const slideAnim = useRef(new Animated.Value(30)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const toastAnim = useRef(new Animated.Value(0)).current;
+    // Tracks the in-flight toast animation so a new toast cancels the
+    // previous one instead of letting its completion callback dismiss it.
+    const toastSequence = useRef<Animated.CompositeAnimation | null>(null);
 
     // Animate result in
     const animateResultIn = () => {
@@ -98,8 +101,13 @@ export const SmartClipboardScreen: React.FC = () => {
     const showToast = (type: 'copy') => {
         if (type === 'copy') setShowCopied(true);
 
+        // Stop any previous toast: its completion callback would otherwise
+        // hide this new toast early. The stale callback is ignored via the
+        // finished/result guard below.
+        toastSequence.current?.stop();
+
         toastAnim.setValue(0);
-        Animated.sequence([
+        const sequence = Animated.sequence([
             Animated.spring(toastAnim, {
                 toValue: 1,
                 tension: 100,
@@ -112,8 +120,13 @@ export const SmartClipboardScreen: React.FC = () => {
                 duration: 300,
                 useNativeDriver: true,
             }),
-        ]).start(() => {
-            setShowCopied(false);
+        ]);
+        toastSequence.current = sequence;
+        sequence.start((result) => {
+            // Only a naturally-finished, still-current toast dismisses itself.
+            if (result?.finished && toastSequence.current === sequence) {
+                setShowCopied(false);
+            }
         });
     };
 
