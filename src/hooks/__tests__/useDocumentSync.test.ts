@@ -2,7 +2,7 @@
  * Tests for useDocumentSync — the PDF document sync engine hook.
  *
  * Strategy: the hook's collaborators are fully mocked —
- *   - '../Database' (isFileIndexed, begin/commit/rollbackTransaction)
+ *   - '../../database' (isFileIndexed, begin/commit/rollbackTransaction)
  *   - '../utils/DocumentPipeline' (processPDF)
  *   - '../utils/AppLogger' (quiet + assertable)
  *   - 'react-native-fs' and '@react-native-async-storage/async-storage'
@@ -22,11 +22,11 @@ import {
   commitTransaction,
   isFileIndexed,
   rollbackTransaction,
-} from '../../Database';
+} from '../../database';
 import { processPDF } from '../../utils/DocumentPipeline';
 import { AppLogger } from '../../utils/AppLogger';
 
-jest.mock('../../Database', () => ({
+jest.mock('../../database', () => ({
   isFileIndexed: jest.fn(),
   beginTransaction: jest.fn(),
   commitTransaction: jest.fn(),

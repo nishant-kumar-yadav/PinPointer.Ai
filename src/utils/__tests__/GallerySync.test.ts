@@ -7,7 +7,7 @@
  *
  * Fakes: timers (the engine sleeps 200–500ms between batches), CameraRoll,
  * AsyncStorage, VisionPipeline.analyzeImage, and the real in-memory
- * op-sqlite mock behind src/Database.ts.
+ * op-sqlite mock behind src/database/*.
  */
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,7 +22,9 @@ import {
   QUICK_SYNC_LIMIT,
 } from '../GallerySync';
 import { analyzeImage } from '../VisionPipeline';
-import * as Database from '../../Database';
+import * as DatabaseDocuments from '../../database/documents';
+import * as DatabaseTransactions from '../../database/transactions';
+import * as DatabaseVectors from '../../database/vectors';
 import {
   setupDatabase,
   clearIndex,
@@ -30,7 +32,7 @@ import {
   isFileIndexed,
   getEmbeddingCount,
   indexDocument,
-} from '../../Database';
+} from '../../database';
 import { AppLogger } from '../AppLogger';
 
 jest.mock('../VisionPipeline', () => ({
@@ -124,7 +126,7 @@ describe('performQuickSync', () => {
   test('indexes every photo in a small gallery and reports the processed count', async () => {
     mockGallery(5);
     const onProgress = jest.fn();
-    const indexSpy = jest.spyOn(Database, 'indexDocument');
+    const indexSpy = jest.spyOn(DatabaseDocuments, 'indexDocument');
 
     const result = await performQuickSync(onProgress);
 
@@ -161,7 +163,7 @@ describe('performQuickSync', () => {
   });
 
   test('skips already-indexed photos without re-analyzing them', async () => {
-    const indexSpy = jest.spyOn(Database, 'indexDocument');
+    const indexSpy = jest.spyOn(DatabaseDocuments, 'indexDocument');
     indexDocument(null, 'old content', uriFor(2), 'IMAGE', 'TEXT');
     indexSpy.mockClear(); // ignore the pre-index call above
     mockGallery(5);
@@ -186,10 +188,10 @@ describe('performQuickSync', () => {
       return visionResult(uri);
     });
     const warnSpy = jest.spyOn(AppLogger, 'warn');
-    const beginSpy = jest.spyOn(Database, 'beginTransaction');
-    const commitSpy = jest.spyOn(Database, 'commitTransaction');
-    const rollbackSpy = jest.spyOn(Database, 'rollbackTransaction');
-    const indexSpy = jest.spyOn(Database, 'indexDocument');
+    const beginSpy = jest.spyOn(DatabaseTransactions, 'beginTransaction');
+    const commitSpy = jest.spyOn(DatabaseTransactions, 'commitTransaction');
+    const rollbackSpy = jest.spyOn(DatabaseTransactions, 'rollbackTransaction');
+    const indexSpy = jest.spyOn(DatabaseDocuments, 'indexDocument');
     mockGallery(5);
 
     const result = await performQuickSync(jest.fn());
@@ -213,9 +215,9 @@ describe('performQuickSync', () => {
   });
 
   test('wraps each photo in a begin/commit transaction on the happy path', async () => {
-    const beginSpy = jest.spyOn(Database, 'beginTransaction');
-    const commitSpy = jest.spyOn(Database, 'commitTransaction');
-    const rollbackSpy = jest.spyOn(Database, 'rollbackTransaction');
+    const beginSpy = jest.spyOn(DatabaseTransactions, 'beginTransaction');
+    const commitSpy = jest.spyOn(DatabaseTransactions, 'commitTransaction');
+    const rollbackSpy = jest.spyOn(DatabaseTransactions, 'rollbackTransaction');
     mockGallery(3);
 
     await performQuickSync(jest.fn());
@@ -387,9 +389,9 @@ describe('performFullGallerySync', () => {
       return visionResult(uri);
     });
     const warnSpy = jest.spyOn(AppLogger, 'warn');
-    const rollbackSpy = jest.spyOn(Database, 'rollbackTransaction');
-    const commitSpy = jest.spyOn(Database, 'commitTransaction');
-    const indexSpy = jest.spyOn(Database, 'indexDocument');
+    const rollbackSpy = jest.spyOn(DatabaseTransactions, 'rollbackTransaction');
+    const commitSpy = jest.spyOn(DatabaseTransactions, 'commitTransaction');
+    const indexSpy = jest.spyOn(DatabaseDocuments, 'indexDocument');
     mockGallery(10);
 
     const result = await runFullSync(jest.fn());
@@ -410,7 +412,7 @@ describe('performFullGallerySync', () => {
     analyzeImageMock.mockResolvedValue(
       visionResult(uriFor(0), { detection_type: 'OBJECT', raw_text: '   ', content: '   ' }),
     );
-    const indexSpy = jest.spyOn(Database, 'indexDocument');
+    const indexSpy = jest.spyOn(DatabaseDocuments, 'indexDocument');
     mockGallery(1);
 
     await runFullSync(jest.fn());
@@ -420,9 +422,9 @@ describe('performFullGallerySync', () => {
   });
 
   test('wraps each photo in a begin/commit transaction on the happy path', async () => {
-    const beginSpy = jest.spyOn(Database, 'beginTransaction');
-    const commitSpy = jest.spyOn(Database, 'commitTransaction');
-    const rollbackSpy = jest.spyOn(Database, 'rollbackTransaction');
+    const beginSpy = jest.spyOn(DatabaseTransactions, 'beginTransaction');
+    const commitSpy = jest.spyOn(DatabaseTransactions, 'commitTransaction');
+    const rollbackSpy = jest.spyOn(DatabaseTransactions, 'rollbackTransaction');
     mockGallery(4);
 
     await runFullSync(jest.fn());
@@ -482,7 +484,7 @@ describe('performFullGallerySync', () => {
   test('indexes the embedding when analyzeImage returns one', async () => {
     const embedding = new Float32Array([0.1, 0.2, 0.3]);
     analyzeImageMock.mockResolvedValue(visionResult(uriFor(0), { embedding }));
-    const embeddingSpy = jest.spyOn(Database, 'indexEmbedding');
+    const embeddingSpy = jest.spyOn(DatabaseVectors, 'indexEmbedding');
     mockGallery(1);
 
     await runFullSync(jest.fn());

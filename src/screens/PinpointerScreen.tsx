@@ -5,7 +5,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 import { addRecentPhoto } from '../utils/RecentPhotos';
-import { DocumentRecord, extractSnippet } from '../Database';
+import { DocumentRecord, extractSnippet } from '../database';
 import { classifyDocument } from '../utils/DocumentClassifier';
 import RNFS from 'react-native-fs';
 import {

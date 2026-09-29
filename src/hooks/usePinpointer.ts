@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Share, Linking, Platform, NativeModules } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { indexDocument } from '../Database';
+import { indexDocument } from '../database';
 import { buildIndexableContent } from '../utils/TextEnrichment';
 import { analyzeImage } from '../utils/VisionPipeline';
 import { AppLogger } from '../utils/AppLogger';

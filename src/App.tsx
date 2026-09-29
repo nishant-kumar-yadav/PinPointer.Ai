@@ -16,7 +16,7 @@ import {
   GalleryScreen,
   DocumentVaultScreen,
 } from './screens';
-import { setupDatabase, closeDatabase } from './Database';
+import { setupDatabase, closeDatabase } from './database';
 import { RootStackParamList } from './navigation/types';
 
 const Stack = createStackNavigator<RootStackParamList>();

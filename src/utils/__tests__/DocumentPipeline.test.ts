@@ -25,8 +25,8 @@ import RNFS from 'react-native-fs';
 import { analyzeImage } from '../VisionPipeline';
 import { soundex } from '../Soundex';
 import { processPDF, processPDFBatch } from '../DocumentPipeline';
-import * as DatabaseModule from '../../Database';
-import { getAllDocuments, clearIndex } from '../../Database';
+import * as DatabaseDocuments from '../../database/documents';
+import { getAllDocuments, clearIndex } from '../../database';
 
 const { NativePdfModule } = NativeModules;
 const pdfModule = NativePdfModule as unknown as {
@@ -45,7 +45,7 @@ const rnfsRead: jest.Mock = RNFSStub.read;
 const rnfsStat = RNFS.stat as unknown as jest.Mock;
 
 // Spy (not stub) on the DB chokepoint: capture index args, keep real writes.
-const indexSpy = jest.spyOn(DatabaseModule, 'indexDocument');
+const indexSpy = jest.spyOn(DatabaseDocuments, 'indexDocument');
 
 const PDF_PATH = '/docs/test-doc.pdf';
 const FILE_URI = 'file:///docs/test-doc.pdf';

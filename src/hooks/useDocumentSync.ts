@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Platform, Alert, Linking, NativeModules } from 'react-native';
 import RNFS from 'react-native-fs';
-import { isFileIndexed, beginTransaction, commitTransaction, rollbackTransaction } from '../Database';
+import { isFileIndexed, beginTransaction, commitTransaction, rollbackTransaction } from '../database';
 import { processPDF } from '../utils/DocumentPipeline';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect } from 'react';

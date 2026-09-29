@@ -22,7 +22,7 @@ import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { AppColors } from '../theme';
 import { analyzeImage } from '../utils/VisionPipeline';
 import { buildIndexableContent } from '../utils/TextEnrichment';
-import { indexDocument } from '../Database';
+import { indexDocument } from '../database';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/types';

@@ -15,7 +15,7 @@ import {
   searchDocuments,
   getIndexedCount,
   clearIndex,
-} from '../Database';
+} from '../database';
 import { analyzeImage } from '../utils/VisionPipeline';
 
 describe('Phase 1 infrastructure', () => {

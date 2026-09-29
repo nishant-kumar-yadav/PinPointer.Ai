@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import { performFullGallerySync, performQuickSync, loadSavedCursor } from '../utils/GallerySync';
-import { getIndexedCount } from '../Database';
+import { getIndexedCount } from '../database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppLogger } from '../utils/AppLogger';
 

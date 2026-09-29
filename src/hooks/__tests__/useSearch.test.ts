@@ -14,10 +14,10 @@
  */
 import { renderHook, act } from '@testing-library/react-native';
 import { useSearch } from '../useSearch';
-import type { DocumentRecord } from '../../Database';
+import type { DocumentRecord } from '../../database';
 import type { SearchHistoryItem } from '../../utils/SearchHistory';
 
-import { searchDocuments } from '../../Database';
+import { searchDocuments } from '../../database';
 import { encodeText } from '../../services/EmbeddingService';
 import {
     loadSearchHistory,
@@ -26,7 +26,7 @@ import {
     clearSearchHistory,
 } from '../../utils/SearchHistory';
 
-jest.mock('../../Database', () => ({
+jest.mock('../../database', () => ({
     searchDocuments: jest.fn(),
 }));
 

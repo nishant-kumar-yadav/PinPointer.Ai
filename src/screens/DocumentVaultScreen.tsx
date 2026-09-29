@@ -13,7 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/types';
-import { getAllDocuments, DocumentRecord } from '../Database';
+import { getAllDocuments, DocumentRecord } from '../database';
 import { classifyDocument, type ClassificationResult, type DocumentCategory } from '../utils/DocumentClassifier';
 
 const { StorageModule } = NativeModules;

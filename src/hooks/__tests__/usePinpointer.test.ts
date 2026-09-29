@@ -20,7 +20,7 @@ jest.mock('../useGallerySync', () => ({ useGallerySync: jest.fn() }));
 jest.mock('../useDocumentSync', () => ({ useDocumentSync: jest.fn() }));
 jest.mock('../useVoiceRecording', () => ({ useVoiceRecording: jest.fn() }));
 jest.mock('react-native-image-picker', () => ({ launchImageLibrary: jest.fn() }));
-jest.mock('../../Database', () => ({ indexDocument: jest.fn() }));
+jest.mock('../../database', () => ({ indexDocument: jest.fn() }));
 jest.mock('../../utils/VisionPipeline', () => ({ analyzeImage: jest.fn() }));
 jest.mock('../../utils/AppLogger', () => ({
     AppLogger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
@@ -31,7 +31,7 @@ import { useGallerySync } from '../useGallerySync';
 import { useDocumentSync } from '../useDocumentSync';
 import { useVoiceRecording } from '../useVoiceRecording';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { indexDocument } from '../../Database';
+import { indexDocument } from '../../database';
 import { analyzeImage } from '../../utils/VisionPipeline';
 import { AppLogger } from '../../utils/AppLogger';
 

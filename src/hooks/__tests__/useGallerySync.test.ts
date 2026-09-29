@@ -18,7 +18,7 @@ import {
   performQuickSync,
   loadSavedCursor,
 } from '../../utils/GallerySync';
-import { getIndexedCount } from '../../Database';
+import { getIndexedCount } from '../../database';
 import { AppLogger } from '../../utils/AppLogger';
 
 jest.mock('../../utils/GallerySync', () => ({
@@ -27,7 +27,7 @@ jest.mock('../../utils/GallerySync', () => ({
   loadSavedCursor: jest.fn(),
 }));
 
-jest.mock('../../Database', () => ({
+jest.mock('../../database', () => ({
   getIndexedCount: jest.fn(),
 }));
 

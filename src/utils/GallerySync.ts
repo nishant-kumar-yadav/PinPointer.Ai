@@ -1,6 +1,6 @@
 import { CameraRoll } from "@react-native-camera-roll/camera-roll";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { indexDocument, isFileIndexed, beginTransaction, commitTransaction, rollbackTransaction, indexEmbedding } from '../Database';
+import { indexDocument, isFileIndexed, beginTransaction, commitTransaction, rollbackTransaction, indexEmbedding } from '../database';
 import { buildIndexableContent } from './TextEnrichment';
 import { analyzeImage } from './VisionPipeline';
 import { AppLogger } from './AppLogger';

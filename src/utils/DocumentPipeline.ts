@@ -23,7 +23,7 @@ import { buildIndexableContent } from './TextEnrichment';
 import { soundexAll } from './Soundex';
 import { classifyDocument, extractSmartTitle, type ClassificationResult } from './DocumentClassifier';
 import { maskSensitiveData } from './DataMasking';
-import { indexDocument } from '../Database';
+import { indexDocument } from '../database';
 import { AppLogger } from './AppLogger';
 
 const { NativePdfModule } = NativeModules;

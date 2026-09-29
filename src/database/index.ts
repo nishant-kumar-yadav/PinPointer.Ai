@@ -1,0 +1,19 @@
+/**
+ * Public barrel for the database layer.
+ *
+ * Every name exported here matches the original `src/Database.ts` public
+ * API exactly — refactors must not add, rename, or drop an entry here
+ * without updating the compatibility check in `__tests__/index.test.ts`.
+ */
+export type { DocumentRecord } from './types';
+export { closeDatabase, setupDatabase } from './connection';
+export {
+  isFileIndexed,
+  indexDocument,
+  getIndexedCount,
+  clearIndex,
+  getAllDocuments,
+} from './documents';
+export { indexEmbedding, hasEmbedding, getEmbeddingCount } from './vectors';
+export { beginTransaction, commitTransaction, rollbackTransaction } from './transactions';
+export { searchDocuments, extractSnippet } from './search';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { searchDocuments, DocumentRecord } from '../Database';
+import { searchDocuments, DocumentRecord } from '../database';
 import { encodeText } from '../services/EmbeddingService';
 import {
     loadSearchHistory, saveSearch, deleteSearchItem,
