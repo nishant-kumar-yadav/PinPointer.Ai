@@ -1,0 +1,228 @@
+/**
+ * Tests for src/database/vectors.ts — sqlite-vec embedding storage.
+ *
+ * Strategy: exercise the real module against the in-memory op-sqlite mock
+ * (routed by jest.config.js moduleNameMapper). The mock implements vec_index
+ * INSERT/DELETE/SELECT/COUNT and no-ops DDL, so setupDatabase() leaves
+ * isVecAvailable() true — the "vec unavailable" paths are forced with a
+ * jest.spyOn on the connection module's isVecAvailable binding.
+ * Raw stored bytes are read back through the mock's vec_index rows.
+ */
+import { getEmbeddingCount, hasEmbedding, indexEmbedding } from '../vectors';
+import { closeDatabase, getDb, isVecAvailable, setupDatabase } from '../connection';
+import * as connectionModule from '../connection';
+
+type MockVectorRow = { document_id: number; embedding: Uint8Array };
+type MockDbInstance = { vectors: MockVectorRow[]; __reset: () => void };
+
+const DIM = 512;
+
+/** Deterministic 512-dim embedding: seed selects the value pattern. */
+const makeEmbedding = (seed = 0): Float32Array => {
+  const arr = new Float32Array(DIM);
+  for (let i = 0; i < DIM; i++) {
+    arr[i] = (i + seed) * 0.25 - 64;
+  }
+  return arr;
+};
+
+/** The mock DB instance behind the connection singleton (same object the module uses). */
+const mockDb = (): MockDbInstance => getDb() as unknown as MockDbInstance;
+
+/** Raw rows the mock stored in vec_index. */
+const storedVectors = (): MockVectorRow[] => mockDb().vectors;
+
+const storedFor = (documentId: number): Uint8Array | undefined =>
+  storedVectors().find((v) => v.document_id === documentId)?.embedding;
+
+const storedBytes = (documentId: number): number[] =>
+  Array.from(storedFor(documentId) ?? []);
+
+beforeEach(() => {
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+  // NOTE: jest.requireMock('@op-engineering/op-sqlite') returns a disconnected
+  // copy of the mock (moduleNameMapper is bypassed), so __resetAll() there
+  // does NOT clear the instance the connection singleton holds. Reset via the
+  // mock's own documented __reset() helper on the live instance instead.
+  mockDb().__reset();
+  setupDatabase();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('indexEmbedding', () => {
+  test('stores a 512-dim embedding so hasEmbedding returns true afterwards', () => {
+    indexEmbedding(7, makeEmbedding(1));
+    expect(hasEmbedding(7)).toBe(true);
+  });
+
+  test('increments getEmbeddingCount', () => {
+    expect(getEmbeddingCount()).toBe(0);
+    indexEmbedding(1, makeEmbedding());
+    indexEmbedding(2, makeEmbedding(5));
+    expect(getEmbeddingCount()).toBe(2);
+  });
+
+  test('re-indexing the same document id overwrites instead of duplicating (DELETE-first)', () => {
+    const latest = makeEmbedding(2);
+    indexEmbedding(3, makeEmbedding(1));
+    indexEmbedding(3, latest);
+    expect(getEmbeddingCount()).toBe(1);
+    expect(hasEmbedding(3)).toBe(true);
+    // The latest bytes win — no stale row lingers.
+    expect(storedVectors().filter((v) => v.document_id === 3)).toHaveLength(1);
+    expect(storedBytes(3)).toEqual(Array.from(new Uint8Array(latest.buffer)));
+  });
+
+  test('keeps each document id isolated', () => {
+    indexEmbedding(1, makeEmbedding(1));
+    indexEmbedding(2, makeEmbedding(2));
+    indexEmbedding(3, makeEmbedding(3));
+    expect(hasEmbedding(1)).toBe(true);
+    expect(hasEmbedding(2)).toBe(true);
+    expect(hasEmbedding(3)).toBe(true);
+    expect(hasEmbedding(4)).toBe(false);
+    expect(getEmbeddingCount()).toBe(3);
+    expect(storedBytes(1)).not.toEqual(storedBytes(2));
+    expect(storedBytes(2)).not.toEqual(storedBytes(3));
+  });
+
+  test('round-trips the exact bytes of the Float32Array buffer', () => {
+    const emb = makeEmbedding(42);
+    indexEmbedding(11, emb);
+    expect(storedBytes(11)).toEqual(Array.from(new Uint8Array(emb.buffer)));
+    expect(storedBytes(11)).toHaveLength(DIM * 4);
+  });
+
+  test('stores the full underlying ArrayBuffer when the view has a non-zero byteOffset', () => {
+    // The module passes `embedding.buffer` (the whole buffer), not just the
+    // view's slice — pin this so a future "fix" is a deliberate change.
+    const buf = new ArrayBuffer(DIM * 4 + 64);
+    const view = new Float32Array(buf, 64, DIM);
+    for (let i = 0; i < DIM; i++) {
+      view[i] = i;
+    }
+    indexEmbedding(12, view);
+    expect(storedBytes(12)).toHaveLength(buf.byteLength);
+    expect(storedBytes(12)).toEqual(Array.from(new Uint8Array(buf)));
+  });
+
+  test('does not crash on a non-512-dim array (the 512-dim requirement is documentary)', () => {
+    expect(() => indexEmbedding(13, new Float32Array(4))).not.toThrow();
+    expect(hasEmbedding(13)).toBe(true);
+    expect(getEmbeddingCount()).toBe(1);
+  });
+
+  test('is a silent no-op when sqlite-vec is unavailable', () => {
+    const getDbSpy = jest.spyOn(connectionModule, 'getDb');
+    const warnSpy = jest.spyOn(console, 'warn');
+    jest.spyOn(connectionModule, 'isVecAvailable').mockReturnValue(false);
+
+    indexEmbedding(20, makeEmbedding());
+
+    expect(getDbSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(hasEmbedding(20)).toBe(false);
+    expect(getEmbeddingCount()).toBe(0);
+    expect(storedVectors()).toHaveLength(0);
+  });
+
+  test('catches DB write failures and only warns', () => {
+    jest
+      .spyOn(connectionModule, 'getDb')
+      .mockImplementationOnce(() => {
+        throw new Error('disk I/O');
+      });
+    const warnSpy = jest.spyOn(console, 'warn');
+
+    expect(() => indexEmbedding(21, makeEmbedding())).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith('[DB] Vector index failed:', expect.any(Error));
+    expect(hasEmbedding(21)).toBe(false);
+  });
+});
+
+describe('hasEmbedding', () => {
+  test('returns false for an unknown document id', () => {
+    expect(hasEmbedding(999)).toBe(false);
+  });
+
+  test('returns false for id 0 and negative ids', () => {
+    expect(hasEmbedding(0)).toBe(false);
+    expect(hasEmbedding(-5)).toBe(false);
+  });
+
+  test('returns true after indexEmbedding', () => {
+    expect(hasEmbedding(30)).toBe(false);
+    indexEmbedding(30, makeEmbedding());
+    expect(hasEmbedding(30)).toBe(true);
+  });
+
+  test('returns false when sqlite-vec is unavailable even if rows exist', () => {
+    indexEmbedding(31, makeEmbedding());
+    expect(hasEmbedding(31)).toBe(true);
+    jest.spyOn(connectionModule, 'isVecAvailable').mockReturnValue(false);
+    expect(hasEmbedding(31)).toBe(false);
+  });
+
+  test('returns false when the DB read throws', () => {
+    jest
+      .spyOn(connectionModule, 'getDb')
+      .mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+    expect(hasEmbedding(32)).toBe(false);
+  });
+});
+
+describe('getEmbeddingCount', () => {
+  test('returns 0 when no embeddings are stored', () => {
+    expect(getEmbeddingCount()).toBe(0);
+  });
+
+  test('returns N after indexing N distinct documents', () => {
+    for (let i = 1; i <= 5; i++) {
+      indexEmbedding(i, makeEmbedding(i));
+    }
+    expect(getEmbeddingCount()).toBe(5);
+  });
+
+  test('does not decrement when a document is re-indexed', () => {
+    indexEmbedding(40, makeEmbedding(1));
+    indexEmbedding(40, makeEmbedding(2));
+    expect(getEmbeddingCount()).toBe(1);
+  });
+
+  test('returns 0 when sqlite-vec is unavailable', () => {
+    indexEmbedding(41, makeEmbedding());
+    expect(getEmbeddingCount()).toBe(1);
+    jest.spyOn(connectionModule, 'isVecAvailable').mockReturnValue(false);
+    expect(getEmbeddingCount()).toBe(0);
+  });
+
+  test('returns 0 when the DB read throws', () => {
+    jest
+      .spyOn(connectionModule, 'getDb')
+      .mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+    expect(getEmbeddingCount()).toBe(0);
+  });
+});
+
+describe('lifecycle', () => {
+  test('embeddings survive closeDatabase (lazy reopen returns the cached instance)', () => {
+    indexEmbedding(50, makeEmbedding(3));
+    expect(hasEmbedding(50)).toBe(true);
+    closeDatabase();
+    expect(hasEmbedding(50)).toBe(true);
+    expect(getEmbeddingCount()).toBe(1);
+  });
+
+  test('reports sqlite-vec as available after setupDatabase', () => {
+    expect(isVecAvailable()).toBe(true);
+  });
+});

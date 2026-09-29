@@ -43,7 +43,6 @@ module.exports = {
     // enforces the thresholds on every covered file under the prefix.
     './src/utils/': { branches: 70, functions: 70, lines: 70, statements: 70 },
     './src/hooks/': { branches: 50, functions: 50, lines: 50, statements: 50 },
-    // TODO(Phase 4): re-enable once src/database/ refactor + tests land.
-    // './src/database/': { branches: 70, functions: 70, lines: 70, statements: 70 },
+    './src/database/': { branches: 70, functions: 70, lines: 70, statements: 70 },
   },
 };
