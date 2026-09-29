@@ -1,0 +1,5 @@
+# Generated / vendored output that should never be linted.
+coverage/
+node_modules/
+android/
+ios/

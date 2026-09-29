@@ -6,6 +6,7 @@ const RNFS = {
   exists: jest.fn(async (_path) => true),
   stat: jest.fn(async (_path) => ({ size: 0, mtime: 0, ctime: 0, isFile: () => true, isDirectory: () => false })),
   readFile: jest.fn(async (_path, _encoding) => ''),
+  read: jest.fn(async (_path, _length, _position, _encoding) => ''),
   writeFile: jest.fn(async (_path, _data, _encoding) => {}),
   appendFile: jest.fn(async () => {}),
   mkdir: jest.fn(async (_path) => {}),
