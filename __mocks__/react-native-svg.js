@@ -2,8 +2,6 @@
  * Mock of react-native-svg — stub components that render nothing.
  * Covers every named export used in src/ (Svg default + Path/Circle/Rect).
  */
-const React = require('react');
-
 const makeStub = (name) => {
   const C = (props) => null;
   C.displayName = name;

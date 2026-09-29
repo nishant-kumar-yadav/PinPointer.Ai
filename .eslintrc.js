@@ -12,5 +12,16 @@ module.exports = {
         'no-undef': 'off',
       },
     },
+    {
+      // Jest infrastructure: setup, config, manual mocks, and test files
+      // run under the jest environment.
+      files: [
+        'jest.setup.js',
+        'jest.config.js',
+        '__mocks__/**/*.js',
+        '**/__tests__/**/*.[jt]s?(x)',
+      ],
+      env: { jest: true },
+    },
   ],
 };
