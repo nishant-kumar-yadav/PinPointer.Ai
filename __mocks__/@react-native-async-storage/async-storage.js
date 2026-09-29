@@ -27,5 +27,5 @@ const AsyncStorage = {
   __reset: () => store.clear(),
 };
 
-module.exports = { default: AsyncStorage };
+module.exports = { __esModule: true, default: AsyncStorage };
 module.exports.AsyncStorage = AsyncStorage;

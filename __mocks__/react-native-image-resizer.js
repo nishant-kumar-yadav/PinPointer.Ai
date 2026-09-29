@@ -8,5 +8,5 @@ const createResizedImage = jest.fn(async (uri, _w, _h, _format, _quality) => ({
   size: 1024,
 }));
 
-module.exports = { default: { createResizedImage } };
+module.exports = { __esModule: true, default: { createResizedImage } };
 module.exports.createResizedImage = createResizedImage;

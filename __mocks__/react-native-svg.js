@@ -13,6 +13,7 @@ const makeStub = (name) => {
 const Svg = makeStub('Svg');
 
 module.exports = {
+  __esModule: true,
   default: Svg,
   Svg,
   Path: makeStub('Path'),
